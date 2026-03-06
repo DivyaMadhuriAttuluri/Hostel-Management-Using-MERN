@@ -1,4 +1,5 @@
 import Complaint from '../models/Complaint.js'
+import { notify } from '../lib/notify.js'
 
 export const createComplaintByStudent = async (req, res) => {
     try{
@@ -113,8 +114,16 @@ export const resolveComplaint = async (req, res) => {
         }
 
         complaint.status = "resolved"
-
         await complaint.save()
+
+        // 🔔 Notify student
+        await notify({
+          studentId: complaint.student,
+          type: "complaint",
+          title: "Complaint Resolved ✅",
+          message: `Your ${complaint.category} complaint has been resolved by the hostel admin.`,
+          refId: complaint._id,
+        });
 
         return res.json({
             success : true,
@@ -151,6 +160,17 @@ export const updateComplaintStatus = async (req, res) => {
 
     complaint.status = status;
     await complaint.save();
+
+    // 🔔 Notify student when resolved
+    if (status === "resolved") {
+      await notify({
+        studentId: complaint.student,
+        type: "complaint",
+        title: "Complaint Resolved ✅",
+        message: `Your ${complaint.category} complaint has been marked as resolved by the admin.`,
+        refId: complaint._id,
+      });
+    }
 
     res.json({ success: true, complaint });
   } catch (error) {

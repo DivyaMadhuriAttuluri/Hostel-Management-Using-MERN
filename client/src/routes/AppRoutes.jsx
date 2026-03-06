@@ -6,6 +6,7 @@ import ProtectedRoute from "../components/layout/ProtectedRoute";
 // auth pages
 import Login from "../pages/auth/Login";
 import Register from "../pages/auth/Register";
+import OAuthSuccess from "../pages/auth/OAuthSuccess";
 
 // student pages
 import StudentDashboard from "../pages/student/Dashboard";
@@ -55,6 +56,9 @@ const AppRoutes = () => {
           isAuthenticated ? <Navigate to="/student" replace /> : <Register />
         }
       />
+
+      {/* 🔐 Google OAuth callback landing page */}
+      <Route path="/oauth-success" element={<OAuthSuccess />} />
 
       {/** Student routes */}
       <Route

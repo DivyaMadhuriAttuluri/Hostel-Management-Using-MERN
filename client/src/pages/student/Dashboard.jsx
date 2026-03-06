@@ -2,6 +2,11 @@ import { useEffect, useState, useContext } from "react";
 import DashboardLayout from "../../components/layout/DashboardLayout";
 import { AuthContext } from "../../context/AuthProvider";
 import { getStudentDashboardStats } from "../../api/user.api";
+import {
+  getMyNotifications,
+  markAllRead,
+  markOneRead,
+} from "../../api/notifications.api";
 import Loader from "../../components/common/Loader";
 import {
   LineChart,
@@ -16,12 +21,14 @@ import {
   Cell,
   Legend,
 } from "recharts";
-import { 
-  CheckCircle, 
-  AlertCircle, 
-  Calendar, 
+import {
+  CheckCircle,
+  AlertCircle,
+  Calendar,
   Megaphone,
-  UtensilsCrossed 
+  UtensilsCrossed,
+  Bell,
+  CheckCheck,
 } from "lucide-react";
 
 // Colors for Pie Chart
@@ -39,22 +46,48 @@ const StudentDashboard = () => {
     recentMessLeaves: []
   });
   const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
         const { data } = await getStudentDashboardStats();
-        if (data.success) {
-          setStats(data.stats);
-        }
+        if (data.success) setStats(data.stats);
       } catch (error) {
         console.error("Failed to fetch dashboard stats", error);
       } finally {
         setLoading(false);
       }
     };
+    const fetchNotifications = async () => {
+      try {
+        const { data } = await getMyNotifications();
+        if (data.success) {
+          setNotifications(data.notifications);
+          setUnreadCount(data.unreadCount);
+        }
+      } catch (e) {
+        console.error("Failed to fetch notifications", e);
+      }
+    };
     fetchStats();
+    fetchNotifications();
   }, []);
+
+  const handleMarkAllRead = async () => {
+    await markAllRead();
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    setUnreadCount(0);
+  };
+
+  const handleMarkOne = async (id) => {
+    await markOneRead(id);
+    setNotifications((prev) =>
+      prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
+    );
+    setUnreadCount((c) => Math.max(0, c - 1));
+  };
 
   if (loading) return <Loader />;
 
@@ -178,6 +211,74 @@ const StudentDashboard = () => {
             )}
           </div>
         </div>
+      </div>
+
+      {/* ────────────────────────────────────────
+          NOTIFICATIONS PANEL
+      ──────────────────────────────────────── */}
+      <div className="mb-8 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-100 dark:border-slate-800">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <Bell className="w-5 h-5 text-blue-400" />
+            <h2 className="text-xl font-semibold text-slate-800 dark:text-white">Notifications</h2>
+            {unreadCount > 0 && (
+              <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full">
+                {unreadCount}
+              </span>
+            )}
+          </div>
+          {unreadCount > 0 && (
+            <button
+              onClick={handleMarkAllRead}
+              className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-400 transition-colors"
+            >
+              <CheckCheck className="w-4 h-4" />
+              Mark all read
+            </button>
+          )}
+        </div>
+
+        {notifications.length === 0 ? (
+          <p className="text-center text-slate-400 py-8 text-sm">No notifications yet</p>
+        ) : (
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800 max-h-80 overflow-y-auto">
+            {notifications.map((n) => (
+              <li
+                key={n._id}
+                onClick={() => !n.isRead && handleMarkOne(n._id)}
+                className={`flex items-start gap-3 px-6 py-4 transition-colors cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 ${
+                  !n.isRead
+                    ? "border-l-4 border-blue-500 bg-blue-50/30 dark:bg-blue-900/10"
+                    : "border-l-4 border-transparent"
+                }`}
+              >
+                {/* Icon by type */}
+                <span className="mt-0.5 text-lg">
+                  {n.type === "complaint" && "🔧"}
+                  {n.type === "mess_leave" && "🍽️"}
+                  {n.type === "booking" && "🏨"}
+                  {n.type === "invoice" && "💸"}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-semibold ${
+                    n.isRead ? "text-slate-500 dark:text-slate-400" : "text-slate-800 dark:text-white"
+                  }`}>
+                    {n.title}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                    {n.message}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {new Date(n.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                {!n.isRead && (
+                  <span className="mt-1.5 w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {/* Bottom Tables Grid */}

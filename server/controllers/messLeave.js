@@ -1,4 +1,5 @@
 import MessLeave from "../models/MessLeave.js";
+import { notify } from "../lib/notify.js";
 
 export const applyMessLeave = async (req, res) => {
   try {
@@ -87,13 +88,18 @@ export const approveMessLeave = async (req, res) => {
     }
 
     leave.status = "approved";
-
     await leave.save();
 
-    res.json({
-      success: true,
-      leave,
+    // 🔔 Notify student
+    await notify({
+      studentId: leave.student,
+      type: "mess_leave",
+      title: "Mess Leave Approved ✅",
+      message: `Your mess leave request from ${new Date(leave.startDate).toLocaleDateString()} to ${new Date(leave.endDate).toLocaleDateString()} has been approved.`,
+      refId: leave._id,
     });
+
+    res.json({ success: true, leave });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

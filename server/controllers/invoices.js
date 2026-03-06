@@ -1,5 +1,6 @@
 import Invoice from '../models/Invoice.js'
 import User from '../models/User.js'
+import { notify } from '../lib/notify.js'
 
 export const getMyInvoices = async (req, res) => {
     try{
@@ -92,6 +93,18 @@ export const createInvoice = async (req, res) => {
 
             await Invoice.insertMany(invoicesToCreate);
 
+            // 🔔 Notify every student
+            await Promise.all(
+              students.map((student) =>
+                notify({
+                  studentId: student._id,
+                  type: "invoice",
+                  title: `New Invoice: ${title} 💸`,
+                  message: `A new invoice of ₹${amount} for "${title}" has been generated. Due date: ${new Date(dueDate).toLocaleDateString()}.`,
+                })
+              )
+            );
+
             return res.status(201).json({
                 success : true,
                 message : `Invoice broadcasted to ${students.length} students`
@@ -131,6 +144,15 @@ export const createInvoice = async (req, res) => {
             success: true,
             message: "Invoice created for student",
             invoice,
+        });
+
+        // 🔔 Notify the student
+        await notify({
+          studentId: student._id,
+          type: "invoice",
+          title: `New Invoice: ${title} 💸`,
+          message: `A new invoice of ₹${amount} for "${title}" has been generated. Due date: ${new Date(dueDate).toLocaleDateString()}.`,
+          refId: invoice._id,
         });
     }
     catch(error){

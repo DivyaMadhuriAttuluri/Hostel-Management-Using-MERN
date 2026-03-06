@@ -3,6 +3,9 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { connectDB } from "./lib/db.js";
+import passport from "passport";
+import "./lib/passport.js";
+
 
 // ------------------ ROUTES ------------------ //
 import authRoutes from "./routes/auth.js";
@@ -15,8 +18,11 @@ import invoiceRoutes from "./routes/invoices.js";
 import roomBookingRoutes from "./routes/roomBooking.js";
 import registrationRoutes from "./routes/registration.js";
 import announcementRoutes from "./routes/announcements.js";
+import notificationRoutes from "./routes/notifications.js";
 
 const app = express();
+app.use(passport.initialize());
+
 
 // ------------------ MIDDLEWARE ------------------ //
 
@@ -48,6 +54,8 @@ app.use("/api/invoices", invoiceRoutes);
 app.use("/api/room-booking", roomBookingRoutes);
 app.use("/api/registration", registrationRoutes);
 app.use("/api/announcements", announcementRoutes);
+app.use("/api/notifications", notificationRoutes);
+
 
 // ------------------ START SERVER ------------------ //
 const PORT = process.env.PORT || 5000;

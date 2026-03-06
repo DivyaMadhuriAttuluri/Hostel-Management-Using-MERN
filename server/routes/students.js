@@ -1,23 +1,46 @@
 import express from "express";
 import { protectRoute } from "../middleware/auth.js";
+import { authorizeRoles } from "../middleware/authorize.js";
+
 import {
   getStudentProfile,
   updateStudentProfile,
   changeStudentPassword,
   getDashboardStats,
 } from "../controllers/students.js";
+
 const router = express.Router();
 
-// Get dashboard stats
-router.get("/dashboard/stats", protectRoute, getDashboardStats);
+// Dashboard stats
+router.get(
+  "/dashboard/stats",
+  protectRoute,
+  authorizeRoles("student"),
+  getDashboardStats
+);
 
-// Get student profile
-router.get("/profile", protectRoute, getStudentProfile);
+// Get profile
+router.get(
+  "/profile",
+  protectRoute,
+  authorizeRoles("student"),
+  getStudentProfile
+);
 
-// Update student profile
-router.put("/profile", protectRoute, updateStudentProfile);
+// Update profile
+router.put(
+  "/profile",
+  protectRoute,
+  authorizeRoles("student"),
+  updateStudentProfile
+);
 
 // Change password
-router.put("/change-password", protectRoute, changeStudentPassword);
+router.put(
+  "/change-password",
+  protectRoute,
+  authorizeRoles("student"),
+  changeStudentPassword
+);
 
 export default router;

@@ -1,6 +1,7 @@
 import RoomBook from '../models/RoomBook.js'
 import GuestRoom from '../models/GuestRoom.js'
 import User from '../models/User.js'
+import { notify } from '../lib/notify.js'
 
 export const getAvailableRooms = async (req, res) =>{
     try{
@@ -218,6 +219,17 @@ export const updateRoomBookingStatus = async (req, res) => {
 
     booking.status = status;
     await booking.save();
+
+    // 🔔 Notify student on approval
+    if (status === "approved") {
+      await notify({
+        studentId: booking.student._id,
+        type: "booking",
+        title: "Guest Room Booking Approved ✅",
+        message: `Your guest room booking (Room ${booking.guestRoomNO}) for ${booking.visitorName} from ${new Date(booking.dateFrom).toLocaleDateString()} to ${new Date(booking.dateTo).toLocaleDateString()} has been approved.`,
+        refId: booking._id,
+      });
+    }
 
     return res.json({
       success: true,
