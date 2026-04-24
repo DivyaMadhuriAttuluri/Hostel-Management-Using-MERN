@@ -1,15 +1,39 @@
 import express from "express";
 import passport from "passport";
 import {
+  authLimiter,
+  sensitiveRouteLimiter,
+} from "../middleware/rateLimiter.js";
+
+// Core auth (register, login, logout, refresh, getMe)
+import {
   registerStudent,
+  getUnavailableRooms,
   loginStudent,
   loginAdmin,
   logoutUser,
   getMe,
-  refreshToken,      // 🔹 NEW
+  refreshToken,
 } from "../controllers/auth.js";
 
+// Password recovery (split for modularity)
+import {
+  forgotPassword,
+  resetPassword,
+  checkRegistrationStatus,
+  sendChangePasswordOtp,
+  verifyChangePasswordOtp,
+} from "../controllers/passwordRecovery.js";
+
+// Admin profile management (split for modularity)
+import {
+  getAdminProfile,
+  updateAdminProfile,
+  changeAdminPassword,
+} from "../controllers/adminProfile.js";
+
 import { protectRoute } from "../middleware/auth.js";
+import { authorizeRoles } from "../middleware/authorize.js";
 
 const router = express.Router();
 
@@ -18,33 +42,78 @@ const router = express.Router();
 // =======================
 
 // student registration request
-router.post("/register", registerStudent);
+router.post("/register", authLimiter, registerStudent);
+
+// rooms unavailable for registration (allocated + pending)
+router.get("/unavailable-rooms", authLimiter, getUnavailableRooms);
 
 // student login
-router.post("/login", loginStudent);
+router.post("/login", authLimiter, loginStudent);
 
 // admin login
-router.post("/admin/login", loginAdmin);
+router.post("/admin/login", authLimiter, loginAdmin);
 
-// 🔄 NEW: refresh access token (NO protectRoute here)
+// 🔄 refresh access token
 router.post("/refresh", refreshToken);
 
-// logout (clears refresh token)
+// logout
 router.post("/logout", logoutUser);
 
 // get current logged-in user
 router.get("/me", protectRoute, getMe);
 
-// 🔐 GOOGLE OAUTH LOGIN
+// =======================
+// PASSWORD RECOVERY (public)
+// =======================
+router.post("/forgot-password", sensitiveRouteLimiter, forgotPassword);
+router.post("/reset-password", authLimiter, resetPassword);
+router.post("/registration-status", authLimiter, checkRegistrationStatus);
+router.post(
+  "/change-password/send-otp",
+  protectRoute,
+  sensitiveRouteLimiter,
+  sendChangePasswordOtp,
+);
+router.post(
+  "/change-password/verify-otp",
+  protectRoute,
+  authLimiter,
+  verifyChangePasswordOtp,
+);
+
+// =======================
+// ADMIN PROFILE (protected)
+// =======================
+router.get(
+  "/admin/profile",
+  protectRoute,
+  authorizeRoles("admin"),
+  getAdminProfile,
+);
+router.put(
+  "/admin/profile",
+  protectRoute,
+  authorizeRoles("admin"),
+  updateAdminProfile,
+);
+router.put(
+  "/admin/change-password",
+  protectRoute,
+  authorizeRoles("admin"),
+  changeAdminPassword,
+);
+
+// =======================
+// GOOGLE OAUTH
+// =======================
 router.get(
   "/google",
   passport.authenticate("google", {
     scope: ["profile", "email"],
     session: false,
-  })
+  }),
 );
 
-// 🔐 GOOGLE OAUTH CALLBACK
 router.get(
   "/google/callback",
   passport.authenticate("google", {
@@ -52,9 +121,8 @@ router.get(
     failureRedirect: "/api/auth/oauth-failed",
   }),
   async (req, res) => {
-    const { generateAccessToken, generateRefreshToken } = await import(
-      "../lib/token.js"
-    );
+    const { generateAccessToken, generateRefreshToken } =
+      await import("../lib/token.js");
     const redis = (await import("../lib/redis.js")).default;
 
     const accessToken = generateAccessToken({
@@ -70,7 +138,7 @@ router.get(
       `refresh:${req.user.id}`,
       refreshToken,
       "EX",
-      7 * 24 * 60 * 60
+      7 * 24 * 60 * 60,
     );
 
     res.cookie("refreshToken", refreshToken, {
@@ -79,11 +147,10 @@ router.get(
       sameSite: "strict",
     });
 
-    // 🚀 Redirect back to frontend with access token
     res.redirect(
-      `${process.env.FRONTEND_URL}/oauth-success?token=${accessToken}`
+      `${process.env.FRONTEND_URL}/oauth-success?token=${accessToken}`,
     );
-  }
+  },
 );
 
 router.get("/oauth-failed", (req, res) => {
@@ -92,7 +159,5 @@ router.get("/oauth-failed", (req, res) => {
     message: "Google login failed. Account not found or not approved.",
   });
 });
-
-
 
 export default router;

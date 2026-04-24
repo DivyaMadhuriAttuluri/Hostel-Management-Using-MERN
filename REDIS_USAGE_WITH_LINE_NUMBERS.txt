@@ -1,0 +1,101 @@
+REDIS USAGE IN THIS PROJECT (WITH LINE NUMBERS)
+
+1) WHY REDIS IS USED HERE
+- Fast in-memory storage for short-lived and security-sensitive data.
+- Used to keep server-side control over refresh tokens (session-like behavior for JWT auth).
+- Used to store OTPs for password reset with automatic expiry.
+- Helps invalidate tokens/OTPs quickly without waiting for JWT expiry.
+
+2) WHAT REDIS IS DOING
+A) Authentication token control
+- Stores refresh tokens after login and OAuth login.
+- Reads refresh token from Redis during /refresh to validate the cookie token.
+- Deletes refresh token on logout.
+
+B) Password recovery
+- Stores OTP with 10-minute TTL.
+- Reads OTP during reset-password verification.
+- Deletes OTP after successful password reset.
+
+C) Connection resilience
+- Retries Redis connection with backoff.
+- Stops retry after 5 attempts and allows app to continue (with Redis-dependent features unavailable).
+- Tracks connection availability via a boolean flag.
+
+3) HOW IT IS DOING THIS (EXACT FILE + LINE NUMBERS)
+
+A) Redis dependency
+- server/package.json:30
+  "ioredis": "^5.9.2"
+
+B) Redis client setup and connection behavior
+- server/lib/redis.js:1
+  Imports ioredis.
+- server/lib/redis.js:3
+  Creates Redis client with host/port.
+- server/lib/redis.js:6
+  maxRetriesPerRequest: null.
+- server/lib/redis.js:7
+  enableOfflineQueue: true.
+- server/lib/redis.js:8
+  retryStrategy configured.
+- server/lib/redis.js:10
+  Warns and stops retrying after 5 attempts.
+- server/lib/redis.js:18
+  redisAvailable flag initialized.
+- server/lib/redis.js:20
+  connect handler marks Redis as available.
+- server/lib/redis.js:25
+  error handler marks Redis as unavailable and logs disconnect.
+- server/lib/redis.js:33
+  close handler marks Redis as unavailable.
+- server/lib/redis.js:37
+  Exposes isRedisAvailable().
+
+C) Refresh token storage and validation (student/admin login flow)
+- server/controllers/auth.js:8
+  Imports Redis client.
+- server/controllers/auth.js:123
+  Stores student refresh token: key refresh:<studentId>.
+- server/controllers/auth.js:124
+  Stored value is refresh token.
+- server/controllers/auth.js:127
+  TTL set to 7 days (7*24*60*60).
+- server/controllers/auth.js:184
+  Stores admin refresh token: key refresh:<adminId>.
+- server/controllers/auth.js:185
+  Stored value is refresh token.
+- server/controllers/auth.js:188
+  TTL set to 7 days.
+- server/controllers/auth.js:221
+  Deletes refresh token on logout.
+- server/controllers/auth.js:267
+  Reads refresh token during /refresh validation.
+
+D) OTP storage and validation (forgot/reset password)
+- server/controllers/passwordRecovery.js:3
+  Imports Redis client.
+- server/controllers/passwordRecovery.js:27
+  Stores OTP using key otp:<collegeEmail>.
+- server/controllers/passwordRecovery.js:27
+  TTL is EX 600 (10 minutes).
+- server/controllers/passwordRecovery.js:67
+  Reads OTP for verification.
+- server/controllers/passwordRecovery.js:87
+  Deletes OTP after successful password reset.
+
+E) Google OAuth refresh token handling
+- server/routes/auth.js:91
+  Dynamically imports Redis client in OAuth callback.
+- server/routes/auth.js:102
+  Stores refresh token for OAuth user.
+- server/routes/auth.js:103
+  Key format refresh:<userId>.
+- server/routes/auth.js:106
+  TTL set to 7 days.
+
+4) KEY TAKEAWAY
+Redis is the short-term security state layer in this app:
+- refresh tokens in Redis make token revocation and server-side verification possible,
+- OTPs in Redis provide quick, expiring password-reset verification,
+- connection strategy in redis.js prevents full app crash when Redis is down.

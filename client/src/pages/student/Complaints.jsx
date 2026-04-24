@@ -1,21 +1,38 @@
 import { useEffect, useState } from "react";
 import DashboardLayout from "../../components/layout/DashboardLayout";
-import {
-  createComplaint,
-  getMyComplaints,
-} from "../../api/complaint.api";
-import Input from "../../components/common/Input";
-import Button from "../../components/common/Button";
+import { createComplaint, getMyComplaints } from "../../api/complaint.api";
 import Loader from "../../components/common/Loader";
 import toast from "react-hot-toast";
+import {
+  FaBolt, FaDroplet, FaUtensils, FaFan, FaLightbulb, FaCircleDot,
+  FaCircleExclamation, FaCircleCheck, FaClock, FaChevronDown,
+  FaPlus, FaTriangleExclamation,
+} from "react-icons/fa6";
+
+const CATEGORIES = [
+  { value: "electricity", label: "Electricity",  icon: FaBolt,    color: "text-yellow-500 bg-yellow-50 dark:bg-yellow-900/20" },
+  { value: "water",       label: "Water",        icon: FaDroplet, color: "text-blue-500 bg-blue-50 dark:bg-blue-900/20" },
+  { value: "mess",        label: "Mess",         icon: FaUtensils,color: "text-orange-500 bg-orange-50 dark:bg-orange-900/20" },
+  { value: "fans",        label: "Fans",         icon: FaFan,     color: "text-cyan-500 bg-cyan-50 dark:bg-cyan-900/20" },
+  { value: "lightbulb",  label: "Lightbulb",    icon: FaLightbulb,color: "text-amber-500 bg-amber-50 dark:bg-amber-900/20" },
+  { value: "other",      label: "Other",        icon: FaCircleDot,color: "text-slate-500 bg-slate-100 dark:bg-slate-800" },
+];
+
+const STATUS_CONFIG = {
+  pending:  { icon: FaClock,       color: "text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400",   label: "Pending" },
+  accepted: { icon: FaCircleExclamation, color: "text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400", label: "In Progress" },
+  resolved: { icon: FaCircleCheck, color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 dark:text-emerald-400", label: "Resolved" },
+};
+
+const getCategoryMeta = (value) =>
+  CATEGORIES.find(c => c.value === value) || CATEGORIES[5];
 
 const Complaints = () => {
   const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    category: "electricity",
-    description: "",
-  });
+  const [submitting, setSubmitting] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState({ category: "electricity", description: "" });
 
   const fetchComplaints = async () => {
     setLoading(true);
@@ -23,185 +40,189 @@ const Complaints = () => {
       const { data } = await getMyComplaints();
       setComplaints(data.complaints || data || []);
     } catch (error) {
-      const errorMessage = error?.response?.data?.message || error?.message || "Failed to load complaints";
-      toast.error(errorMessage);
-      console.error("Failed to load complaints:", error);
+      toast.error(error?.response?.data?.message || "Failed to load complaints");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchComplaints();
-  }, []);
+  useEffect(() => { fetchComplaints(); }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("=== COMPLAINT SUBMISSION START ===");
-    console.log("1. Form submitted, formData:", formData);
-    
-    if (!formData.description.trim()) {
-      console.log("2. Validation failed: Empty description");
-      toast.error("Please enter a description");
-      return;
-    }
-
-    console.log("3. Validation passed, creating toast");
-    const submitToast = toast.loading("Submitting complaint...");
-    
+    if (!formData.description.trim()) return toast.error("Please enter a description");
+    setSubmitting(true);
+    const t = toast.loading("Submitting complaint...");
     try {
-      console.log("4. Calling createComplaint API with data:", formData);
       const response = await createComplaint(formData);
-      console.log("5. API Response received:", response);
-      console.log("6. Response data:", response?.data);
-      console.log("7. Response status:", response?.status);
-      
       if (response?.data?.success) {
-        console.log("8. Success! Response indicates success");
-        toast.success(response.data.message || "Complaint submitted successfully!", { id: submitToast });
-        console.log("9. Resetting form and refreshing complaints");
+        toast.success("Complaint submitted!", { id: t });
         setFormData({ category: "electricity", description: "" });
+        setShowForm(false);
         fetchComplaints();
-        console.log("10. Complaint submission completed successfully");
       } else {
-        console.log("8. Failed! Response does not indicate success:", response?.data);
-        toast.error(response?.data?.message || "Failed to submit complaint", { id: submitToast });
+        toast.error(response?.data?.message || "Failed", { id: t });
       }
     } catch (error) {
-      console.error("=== COMPLAINT SUBMISSION ERROR ===");
-      console.error("Error object:", error);
-      console.error("Error response:", error?.response);
-      console.error("Error response data:", error?.response?.data);
-      console.error("Error message:", error?.message);
-      console.error("Error stack:", error?.stack);
-      
-      const errorMessage = error?.response?.data?.message || error?.response?.data?.error || error?.message || "Failed to submit complaint";
-      console.error("Final error message to show:", errorMessage);
-      toast.error(errorMessage, { id: submitToast });
+      toast.error(error?.response?.data?.message || "Failed to submit", { id: t });
+    } finally {
+      setSubmitting(false);
     }
-    console.log("=== COMPLAINT SUBMISSION END ===");
+  };
+
+  // Group by status
+  const grouped = {
+    pending:  complaints.filter(c => c.status === "pending"),
+    accepted: complaints.filter(c => c.status === "accepted"),
+    resolved: complaints.filter(c => c.status === "resolved"),
   };
 
   return (
     <DashboardLayout>
-      <h1 className="text-2xl font-semibold text-slate-800 dark:text-white mb-6">
-        Complaints
-      </h1>
-
-      {/* New Complaint */}
-      <div className="bg-white dark:bg-slate-800 p-8 rounded-xl shadow-lg mb-8 border border-slate-200 dark:border-slate-700 w-full transition-all">
-        <h2 className="text-xl font-semibold text-slate-800 dark:text-white mb-6">Submit New Complaint</h2>
-        <form
-            onSubmit={(e) => {
-            console.log("Form onSubmit triggered");
-            handleSubmit(e);
-            }}
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Complaints</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            {complaints.length} total complaint{complaints.length !== 1 ? "s" : ""}
+          </p>
+        </div>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold text-sm shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:-translate-y-0.5 transition-all"
         >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-white mb-2">
-                    Category
-                    </label>
-                    <div className="relative">
-                        <select
-                        className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow appearance-none"
-                        value={formData.category}
-                        onChange={(e) =>
-                            setFormData((p) => ({
-                            ...p,
-                            category: e.target.value,
-                            }))
-                        }
-                        >
-                        {["electricity", "water", "mess", "fans", "lightbulb", "other"].map(
-                            (opt) => (
-                            <option key={opt} value={opt} className="capitalize">
-                                {opt}
-                            </option>
-                            )
-                        )}
-                        </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
-                            <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="md:col-span-2">
-                    <Input
-                        label="Description"
-                        name="description"
-                        value={formData.description}
-                        onChange={(e) =>
-                        setFormData((p) => ({
-                            ...p,
-                            description: e.target.value,
-                        }))
-                        }
-                        required
-                        placeholder="Describe your issue in detail..."
-                        className="w-full"
-                    />
-                </div>
-            </div>
-            
-            <div className="flex justify-end">
-                <button
-                type="submit"
-                className="px-6 py-3 rounded-lg font-medium transition bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg transform active:scale-95"
-                onClick={() => console.log("Submit button clicked")}
-                >
-                Submit Complaint
-                </button>
-            </div>
-        </form>
+          <FaPlus className="w-4 h-4" />
+          New Complaint
+        </button>
       </div>
 
-      {/* Complaint List */}
-      <div className="bg-white dark:bg-slate-800 p-8 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 w-full">
-        <h2 className="text-xl font-semibold text-slate-800 dark:text-white mb-6">Your Complaints history</h2>
-        {loading ? (
-          <Loader />
-        ) : complaints.length === 0 ? (
-          <div className="text-center py-12 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-dashed border-slate-300 dark:border-slate-700">
-             <p className="text-slate-500 dark:text-slate-400 text-lg">No complaints submitted yet.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {complaints.map((c) => (
-              <div
-                key={c._id}
-                className="border border-slate-200 dark:border-slate-700 rounded-xl p-6 bg-slate-50 dark:bg-slate-900 hover:bg-white dark:hover:bg-slate-800 hover:shadow-lg transition-all flex flex-col h-full"
+      {/* Submit Form */}
+      {showForm && (
+        <div className="mb-8 bg-white dark:bg-slate-900 rounded-2xl p-7 border border-slate-200 dark:border-slate-800 shadow-sm">
+          <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-5 flex items-center gap-2">
+            <FaTriangleExclamation className="text-orange-500 w-5 h-5" />
+            Submit New Complaint
+          </h2>
+          <form onSubmit={handleSubmit}>
+            {/* Category grid */}
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Category</p>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-5">
+              {CATEGORIES.map(({ value, label, icon: Icon, color }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setFormData(p => ({ ...p, category: value }))}
+                  className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-xs font-medium ${
+                    formData.category === value
+                      ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                      : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-slate-600 dark:text-slate-400"
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${color}`}>
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Description */}
+            <div className="mb-5">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                Description <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={e => setFormData(p => ({ ...p, description: e.target.value }))}
+                placeholder="Describe your issue in detail — location, when it started, what you've observed..."
+                rows={4}
+                required
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm transition-all"
+              />
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <span className="px-3 py-1 bg-slate-200 dark:bg-slate-700 rounded-full text-xs font-bold text-slate-700 dark:text-slate-300 capitalize tracking-wide">
-                    {c.category}
-                  </span>
-                  <span className={`text-xs px-2 py-1 rounded-full font-bold uppercase ${
-                    c.status === "resolved" 
-                      ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                      : c.status === "accepted"
-                      ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                      : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                  }`}>
-                    {c.status}
-                  </span>
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold text-sm shadow-md disabled:opacity-60 hover:-translate-y-0.5 transition-all"
+              >
+                {submitting ? "Submitting..." : "Submit Complaint"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Kanban Board */}
+      {loading ? (
+        <Loader />
+      ) : complaints.length === 0 ? (
+        <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+          <FaCircleExclamation className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
+          <p className="text-slate-500 dark:text-slate-400 text-lg font-medium">No complaints submitted yet</p>
+          <p className="text-sm text-slate-400 mt-1">Click "New Complaint" to get started</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {Object.entries(grouped).map(([status, items]) => {
+            const cfg = STATUS_CONFIG[status];
+            const StatusIcon = cfg.icon;
+            return (
+              <div key={status} className="flex flex-col">
+                {/* Column header */}
+                <div className={`flex items-center gap-2 px-4 py-3 rounded-xl mb-3 ${cfg.color}`}>
+                  <StatusIcon className="w-4 h-4" />
+                  <span className="font-bold text-sm">{cfg.label}</span>
+                  <span className="ml-auto text-xs font-bold opacity-70">{items.length}</span>
                 </div>
-                
-                <p className="text-slate-800 dark:text-white text-base font-medium mb-4 flex-1">
-                    {c.description}
-                </p>
-                
-                <div className="mt-auto pt-4 border-t border-slate-200 dark:border-slate-700/50">
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Submitted on: {new Date(c.createdAt).toLocaleDateString()}
-                    </p>
+
+                {/* Cards */}
+                <div className="space-y-3 flex-1">
+                  {items.length === 0 ? (
+                    <div className="text-center py-8 text-slate-400 text-sm bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
+                      No {status} complaints
+                    </div>
+                  ) : (
+                    items.map(c => {
+                      const cat = getCategoryMeta(c.category);
+                      const CatIcon = cat.icon;
+                      return (
+                        <div
+                          key={c._id}
+                          className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all"
+                        >
+                          <div className="flex items-start gap-3 mb-3">
+                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${cat.color}`}>
+                              <CatIcon className="w-4 h-4" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{cat.label}</span>
+                              <p className="text-sm font-medium text-slate-800 dark:text-white mt-0.5 leading-snug line-clamp-3">
+                                {c.description}
+                              </p>
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-2 mt-2">
+                            Submitted {new Date(c.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </DashboardLayout>
   );
 };

@@ -8,6 +8,7 @@ import { getErrorMessage } from "../../utils/apiError";
 import RoomCard from "../../components/booking/RoomCard";
 import BookingForm from "../../components/booking/BookingForm";
 import toast from "react-hot-toast";
+import { FaBed, FaArrowsRotate } from "react-icons/fa6";
 
 export const GuestRoomBooking = () => {
   const [allRooms, setAllRooms] = useState([]); // All rooms with status

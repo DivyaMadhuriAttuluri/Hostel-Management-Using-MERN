@@ -33,6 +33,23 @@ const studentRegistrationRequestSchema = new mongoose.Schema(
       required: true 
     }, // hashed
 
+    // 🆘 Emergency Contact
+    parentName: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    parentPhone: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    bloodGroup: {
+      type: String,
+      default: "",
+      enum: ["", "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
+    },
+
     status: {
       type: String,
       enum: ["pending", "approved", "rejected"],

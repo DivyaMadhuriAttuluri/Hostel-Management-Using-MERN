@@ -151,6 +151,9 @@ export const approveStudent = async (req, res) => {
       password: request.password,
       isApproved: true,
       approvedBy: req.user._id,
+      parentName: request.parentName || "",
+      parentPhone: request.parentPhone || "",
+      bloodGroup: request.bloodGroup || "",
     });
 
     request.status = "approved";
@@ -372,22 +375,46 @@ export const deleteStudent = async (req, res) => {
       });
     }
 
-    const id = student._id;
-
-    // 🗑️ Remove all related data
-    await Promise.all([
-      Attendance.deleteMany({ student: id }),
-      Complaint.deleteMany({ student: id }),
-      Invoice.deleteMany({ student: id }),
-      MessLeave.deleteMany({ student: id }),
-      RoomBook.deleteMany({ student: id }),
-      Notification.deleteMany({ student: id }),
-      User.findByIdAndDelete(id),
-    ]);
+    // ♻️ Soft delete: deactivate instead of permanently removing
+    student.isActive = false;
+    student.isApproved = false;
+    await student.save();
 
     res.json({
       success: true,
-      message: `Student ${student.fullName} (${student.studentID}) deleted successfully`,
+      message: `Student ${student.fullName} (${student.studentID}) has been deactivated`,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/* ======================================================
+   REACTIVATE STUDENT
+   PATCH /api/admin/students/:studentId/reactivate
+====================================================== */
+export const reactivateStudent = async (req, res) => {
+  try {
+    const student = await User.findById(req.params.studentId);
+
+    if (!student) {
+      return res.status(404).json({ success: false, message: "Student not found" });
+    }
+
+    if (student.hostelBlock !== req.user.hostelBlock) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized for this hostel block",
+      });
+    }
+
+    student.isActive = true;
+    student.isApproved = true;
+    await student.save();
+
+    res.json({
+      success: true,
+      message: `Student ${student.fullName} (${student.studentID}) has been reactivated`,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

@@ -14,22 +14,27 @@ export const submitRegistrationRequest = async (req, res) => {
       password,
     } = req.body;
 
-    // 1️⃣ Prevent duplicate approved users
+    // 1️⃣ Prevent using an already allocated room
+    const existingRoomAllocation = await User.findOne({ hostelBlock, roomNO });
+
+    if (existingRoomAllocation) {
+      return res.status(400).json({
+        message: "This room is already allocated",
+      });
+    }
+
+    // 2️⃣ Prevent duplicate approved users
     const existingUser = await User.findOne({
-      $or: [
-        { studentID },
-        { collegeEmail },
-        { hostelBlock, roomNO }, // ✅ FIXED
-      ],
+      $or: [{ studentID }, { collegeEmail }],
     });
 
     if (existingUser) {
       return res.status(400).json({
-        message: "Student already registered or room already allocated",
+        message: "Student already registered",
       });
     }
 
-    // 2️⃣ Prevent duplicate pending requests
+    // 3️⃣ Prevent duplicate pending requests
     const existingRequest = await StudentRegistrationRequest.findOne({
       $or: [
         { studentID, status: "pending" },
@@ -44,10 +49,10 @@ export const submitRegistrationRequest = async (req, res) => {
       });
     }
 
-    // 3️⃣ Hash password
+    // 4️⃣ Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 4️⃣ Create registration request
+    // 5️⃣ Create registration request
     await StudentRegistrationRequest.create({
       fullName,
       studentID,

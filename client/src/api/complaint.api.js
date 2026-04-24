@@ -22,6 +22,6 @@ export const getMyComplaints = () =>
 export const getAllComplaints = () =>
   api.get("/complaints/admin");
 
-// update complaint status
-export const updateComplaintStatus = (id, status) =>
-  api.patch(`/complaints/${id}/status`, { status });
+// update complaint status (optionally with a resolution note)
+export const updateComplaintStatus = (id, status, resolutionNote = "") =>
+  api.patch(`/complaints/${id}/status`, { status, resolutionNote });

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { registerStudent } from "../../api/auth.api";
+import { registerStudent, getUnavailableRooms } from "../../api/auth.api";
 import { getErrorMessage } from "../../utils/apiError";
 import toast from "react-hot-toast";
 
@@ -19,21 +19,24 @@ const FLOORS = [
 ];
 
 const ALL_ROOMS = FLOORS.flatMap(({ prefix }) =>
-  Array.from({ length: 100 }, (_, i) => `${prefix}-${i + 1}`)
+  Array.from({ length: 100 }, (_, i) => `${prefix}-${i + 1}`),
 );
 
 // ─────────────────────────────────────────────
 // RoomSearch — searchable combobox
 // ─────────────────────────────────────────────
-const RoomSearch = ({ value, onChange, disabled }) => {
+const RoomSearch = ({ value, onChange, disabled, unavailableRooms = [] }) => {
   const [query, setQuery] = useState(value || "");
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
+  const unavailableSet = new Set(unavailableRooms);
 
   // Filter rooms: show only if query has content
   const filtered = query.trim()
-    ? ALL_ROOMS.filter((r) =>
-        r.toLowerCase().includes(query.toLowerCase())
+    ? ALL_ROOMS.filter(
+        (r) =>
+          r.toLowerCase().includes(query.toLowerCase()) &&
+          !unavailableSet.has(r),
       ).slice(0, 20) // cap at 20 visible options
     : [];
 
@@ -147,9 +150,13 @@ const Register = () => {
     hostelBlock: "",
     roomNO: "",
     password: "",
+    parentName: "",
+    parentPhone: "",
+    bloodGroup: "",
   });
 
   const [loading, setLoading] = useState(false);
+  const [unavailableRooms, setUnavailableRooms] = useState([]);
 
   const handleChange = (e) => {
     setFormData((prev) => ({
@@ -179,6 +186,9 @@ const Register = () => {
         hostelBlock: "",
         roomNO: "",
         password: "",
+        parentName: "",
+        parentPhone: "",
+        bloodGroup: "",
       });
     } catch (error) {
       toast.error(getErrorMessage(error, "Registration failed"));
@@ -186,6 +196,41 @@ const Register = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const selectedBlock = formData.hostelBlock;
+
+    if (!selectedBlock) {
+      setUnavailableRooms([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadUnavailableRooms = async () => {
+      try {
+        const { data } = await getUnavailableRooms(selectedBlock);
+        if (cancelled) return;
+
+        const rooms = Array.isArray(data?.rooms) ? data.rooms : [];
+        setUnavailableRooms(rooms);
+
+        setFormData((prev) =>
+          rooms.includes(prev.roomNO) ? { ...prev, roomNO: "" } : prev,
+        );
+      } catch {
+        if (!cancelled) {
+          setUnavailableRooms([]);
+        }
+      }
+    };
+
+    loadUnavailableRooms();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [formData.hostelBlock]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white dark:bg-slate-950 text-slate-900 dark:text-white transition-colors duration-300 py-8">
@@ -228,13 +273,19 @@ const Register = () => {
             required
             className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:opacity-50"
           >
-            <option value="" disabled>Select your branch</option>
-            <option value="CSE">CSE — Computer Science &amp; Engineering</option>
+            <option value="" disabled>
+              Select your branch
+            </option>
+            <option value="CSE">
+              CSE — Computer Science &amp; Engineering
+            </option>
             <option value="ECE">ECE — Electronics &amp; Communication</option>
             <option value="EEE">EEE — Electrical &amp; Electronics</option>
             <option value="MECH">MECH — Mechanical Engineering</option>
             <option value="CIVIL">CIVIL — Civil Engineering</option>
-            <option value="METALLURGY">METALLURGY — Metallurgical Engineering</option>
+            <option value="METALLURGY">
+              METALLURGY — Metallurgical Engineering
+            </option>
             <option value="MINING">MINING — Mining Engineering</option>
             <option value="CHEMICAL">CHEMICAL — Chemical Engineering</option>
           </select>
@@ -258,12 +309,20 @@ const Register = () => {
           <select
             name="hostelBlock"
             value={formData.hostelBlock}
-            onChange={handleChange}
+            onChange={(e) =>
+              setFormData((prev) => ({
+                ...prev,
+                hostelBlock: e.target.value,
+                roomNO: "",
+              }))
+            }
             disabled={loading}
             required
             className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:opacity-50"
           >
-            <option value="" disabled>Select your hostel block</option>
+            <option value="" disabled>
+              Select your hostel block
+            </option>
             <option value="A">Block A</option>
             <option value="B">Block B</option>
             <option value="C">Block C</option>
@@ -276,6 +335,7 @@ const Register = () => {
           onChange={(room) =>
             setFormData((prev) => ({ ...prev, roomNO: room }))
           }
+          unavailableRooms={unavailableRooms}
           disabled={loading}
         />
 
@@ -288,6 +348,56 @@ const Register = () => {
           disabled={loading}
           required
         />
+
+        {/* Emergency Contact Section */}
+        <div className="mt-4 mb-2">
+          <p className="text-sm font-medium text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 pb-2">
+            Emergency Contact (Optional)
+          </p>
+        </div>
+
+        <Input
+          label="Parent/Guardian Name"
+          name="parentName"
+          value={formData.parentName}
+          onChange={handleChange}
+          disabled={loading}
+          placeholder="Parent or guardian name"
+        />
+
+        <Input
+          label="Parent Phone Number"
+          name="parentPhone"
+          type="tel"
+          value={formData.parentPhone}
+          onChange={handleChange}
+          disabled={loading}
+          placeholder="+91-XXXXXXXXXX"
+        />
+
+        {/* Blood Group Dropdown */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+            Blood Group
+          </label>
+          <select
+            name="bloodGroup"
+            value={formData.bloodGroup}
+            onChange={handleChange}
+            disabled={loading}
+            className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:opacity-50"
+          >
+            <option value="">Select blood group</option>
+            <option value="A+">A+</option>
+            <option value="A-">A-</option>
+            <option value="B+">B+</option>
+            <option value="B-">B-</option>
+            <option value="AB+">AB+</option>
+            <option value="AB-">AB-</option>
+            <option value="O+">O+</option>
+            <option value="O-">O-</option>
+          </select>
+        </div>
 
         <Button type="submit" disabled={loading} className="w-full mt-4">
           {loading ? <Loader /> : "Register"}

@@ -134,6 +134,25 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+
+    // 🆘 Emergency Contact Info
+    parentName: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    parentPhone: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    bloodGroup: {
+      type: String,
+      default: "",
+      enum: ["", "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
+    },
   },
   { timestamps: true }
 );

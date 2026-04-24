@@ -10,6 +10,7 @@ import {
   getPendingRegistrations,
   getDashboardStats,
   deleteStudent,
+  reactivateStudent,
 } from "../controllers/admin.js";
 
 const router = express.Router();
@@ -62,12 +63,20 @@ router.patch(
   rejectStudent
 );
 
-// Delete student
+// Delete (soft-delete) student
 router.delete(
   "/students/:studentId",
   protectRoute,
   authorizeRoles("admin"),
   deleteStudent
+);
+
+// Reactivate student
+router.patch(
+  "/students/:studentId/reactivate",
+  protectRoute,
+  authorizeRoles("admin"),
+  reactivateStudent
 );
 
 export default router;

@@ -2,43 +2,59 @@ import { NavLink } from "react-router-dom";
 import { useContext, useState } from "react";
 import { AuthContext } from "../../context/AuthProvider";
 import {
-  FaTachometerAlt,
-  FaBed,
-  FaBookmark,
-  FaExclamationCircle,
-  FaUtensils,
-  FaFileInvoiceDollar,
-  FaBullhorn,
-  FaUsers,
-  FaClipboardCheck,
+  FaGauge,        // Dashboard
+  FaBed,          // Guest Room / Room Bookings
+  FaBookmark,     // My Bookings
+  FaCircleExclamation, // Complaints
+  FaUtensils,     // Mess Leave
+  FaFileInvoiceDollar, // Invoices
+  FaBullhorn,     // Announcements
+  FaUsers,        // Students
+  FaClipboardCheck,    // Attendance
   FaBars,
-  FaTimes
-} from "react-icons/fa";
+  FaXmark,
+  FaArrowRightArrowLeft, // Room Change
+  FaClipboardList,     // Mess Menu
+  FaCalendarCheck,
+  FaCircleUser,        // Profile initials fallback
+  FaChevronRight,
+} from "react-icons/fa6";
 
 const Sidebar = () => {
   const { authUser } = useContext(AuthContext);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const close = () => setIsMobileMenuOpen(false);
 
-  // Dynamic link classes
   const linkClasses = ({ isActive }) =>
-    `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-medium ${
+    `flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 font-medium text-sm ${
       isActive
-        ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md transform scale-[1.02]"
-        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-blue-600 dark:hover:text-white hover:pl-5"
+        ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25"
+        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white"
     }`;
 
   const SectionTitle = ({ children }) => (
-    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-4 mt-6">
+    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5 px-4 mt-5">
       {children}
     </p>
   );
+
+  // User initials avatar
+  const initials = authUser?.fullName
+    ? authUser.fullName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()
+    : authUser?.name
+    ? authUser.name.slice(0, 2).toUpperCase()
+    : "U";
+
+  const roleColor = authUser?.role === "admin"
+    ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400"
+    : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400";
 
   return (
     <>
       {/* Mobile Menu Button */}
       <button
         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        className="md:hidden fixed top-4 left-4 z-50 p-2.5 bg-slate-900/90 backdrop-blur-sm text-white rounded-lg shadow-xl border border-slate-700 hover:bg-slate-800 transition-colors"
+        className="md:hidden fixed top-4 left-4 z-50 p-2.5 bg-white dark:bg-slate-900 text-slate-700 dark:text-white rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
         aria-label="Toggle menu"
       >
         <FaBars className="w-5 h-5" />
@@ -47,8 +63,8 @@ const Sidebar = () => {
       {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div
-          className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity"
-          onClick={() => setIsMobileMenuOpen(false)}
+          className="md:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+          onClick={close}
         />
       )}
 
@@ -56,117 +72,138 @@ const Sidebar = () => {
       <aside
         className={`${
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-        } md:translate-x-0 fixed md:relative inset-y-0 left-0 w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col z-50 md:z-10 transition-transform duration-300 ease-out min-h-screen shadow-lg dark:shadow-none`}
+        } md:translate-x-0 fixed md:relative inset-y-0 left-0 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col z-50 md:z-10 transition-transform duration-300 ease-out shadow-xl md:shadow-none`}
       >
-        {/* Sidebar Header (Mobile Only - Desktop uses Navbar) */}
-        <div className="md:hidden p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">HM</span>
-            </div>
-            <span className="text-slate-900 dark:text-white font-bold text-lg">Menu</span>
-          </div>
-          <button
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
-          >
-            <FaTimes className="w-5 h-5" />
+        {/* Mobile Header */}
+        <div className="md:hidden p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <span className="font-bold text-slate-800 dark:text-white text-lg">Menu</span>
+          <button onClick={close} className="p-2 text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors">
+            <FaXmark className="w-5 h-5" />
           </button>
         </div>
 
         {/* Navigation Links */}
-        <nav className="flex-1 px-4 py-6 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-800 scrollbar-track-transparent">
-          
-          {/* STUDENT LINKS */}
+        <nav className="flex-1 px-3 py-5 overflow-y-auto space-y-0.5 scrollbar-thin">
+          {/* ── STUDENT LINKS ── */}
           {authUser?.role === "student" && (
             <>
-              <div className="space-y-1">
-                <NavLink to="/student" end className={linkClasses} onClick={() => setIsMobileMenuOpen(false)}>
-                  <FaTachometerAlt className="w-5 h-5" />
-                  <span>Dashboard</span>
-                </NavLink>
-              </div>
+              <NavLink to="/student" end className={linkClasses} onClick={close}>
+                <FaGauge className="w-4 h-4 flex-shrink-0" />
+                <span>Dashboard</span>
+              </NavLink>
 
               <SectionTitle>Services</SectionTitle>
-              <div className="space-y-1">
-                <NavLink to="/student/guest-room-booking" className={linkClasses} onClick={() => setIsMobileMenuOpen(false)}>
-                  <FaBed className="w-5 h-5" />
-                  <span>Guest Room</span>
-                </NavLink>
-                <NavLink to="/student/my-bookings" className={linkClasses} onClick={() => setIsMobileMenuOpen(false)}>
-                  <FaBookmark className="w-5 h-5" />
-                  <span>My Bookings</span>
-                </NavLink>
-                <NavLink to="/student/complaints" className={linkClasses} onClick={() => setIsMobileMenuOpen(false)}>
-                  <FaExclamationCircle className="w-5 h-5" />
-                  <span>Complaints</span>
-                </NavLink>
-                <NavLink to="/student/mess-leaves" className={linkClasses} onClick={() => setIsMobileMenuOpen(false)}>
-                  <FaUtensils className="w-5 h-5" />
-                  <span>Mess Leaves</span>
-                </NavLink>
-                <NavLink to="/student/invoices" className={linkClasses} onClick={() => setIsMobileMenuOpen(false)}>
-                  <FaFileInvoiceDollar className="w-5 h-5" />
-                  <span>Invoices</span>
-                </NavLink>
-                <NavLink to="/student/announcements" className={linkClasses} onClick={() => setIsMobileMenuOpen(false)}>
-                  <FaBullhorn className="w-5 h-5" />
-                  <span>Announcements</span>
-                </NavLink>
-              </div>
+              <NavLink to="/student/guest-room-booking" className={linkClasses} onClick={close}>
+                <FaBed className="w-4 h-4 flex-shrink-0" />
+                <span>Guest Room</span>
+              </NavLink>
+              <NavLink to="/student/my-bookings" className={linkClasses} onClick={close}>
+                <FaBookmark className="w-4 h-4 flex-shrink-0" />
+                <span>My Bookings</span>
+              </NavLink>
+              <NavLink to="/student/complaints" className={linkClasses} onClick={close}>
+                <FaCircleExclamation className="w-4 h-4 flex-shrink-0" />
+                <span>Complaints</span>
+              </NavLink>
+              <NavLink to="/student/mess-leaves" className={linkClasses} onClick={close}>
+                <FaUtensils className="w-4 h-4 flex-shrink-0" />
+                <span>Mess Leaves</span>
+              </NavLink>
+              <NavLink to="/student/mess-menu" className={linkClasses} onClick={close}>
+                <FaClipboardList className="w-4 h-4 flex-shrink-0" />
+                <span>Mess Menu</span>
+              </NavLink>
+              <NavLink to="/student/invoices" className={linkClasses} onClick={close}>
+                <FaFileInvoiceDollar className="w-4 h-4 flex-shrink-0" />
+                <span>Invoices</span>
+              </NavLink>
+
+              <SectionTitle>Info</SectionTitle>
+              <NavLink to="/student/announcements" className={linkClasses} onClick={close}>
+                <FaBullhorn className="w-4 h-4 flex-shrink-0" />
+                <span>Announcements</span>
+              </NavLink>
+              <NavLink to="/student/attendance" className={linkClasses} onClick={close}>
+                <FaCalendarCheck className="w-4 h-4 flex-shrink-0" />
+                <span>My Attendance</span>
+              </NavLink>
+              <NavLink to="/student/room-change" className={linkClasses} onClick={close}>
+                <FaArrowRightArrowLeft className="w-4 h-4 flex-shrink-0" />
+                <span>Room Change</span>
+              </NavLink>
             </>
           )}
 
-          {/* ADMIN LINKS */}
+          {/* ── ADMIN LINKS ── */}
           {authUser?.role === "admin" && (
             <>
-              <div className="space-y-1">
-                <NavLink to="/admin" end className={linkClasses} onClick={() => setIsMobileMenuOpen(false)}>
-                  <FaTachometerAlt className="w-5 h-5" />
-                  <span>Dashboard</span>
-                </NavLink>
-              </div>
+              <NavLink to="/admin" end className={linkClasses} onClick={close}>
+                <FaGauge className="w-4 h-4 flex-shrink-0" />
+                <span>Dashboard</span>
+              </NavLink>
 
               <SectionTitle>Management</SectionTitle>
-              <div className="space-y-1">
-                <NavLink to="/admin/students" className={linkClasses} onClick={() => setIsMobileMenuOpen(false)}>
-                  <FaUsers className="w-5 h-5" />
-                  <span>Manage Students</span>
-                </NavLink>
-                <NavLink to="/admin/bookings" className={linkClasses} onClick={() => setIsMobileMenuOpen(false)}>
-                  <FaBed className="w-5 h-5" />
-                  <span>Room Bookings</span>
-                </NavLink>
-                <NavLink to="/admin/complaints" className={linkClasses} onClick={() => setIsMobileMenuOpen(false)}>
-                  <FaExclamationCircle className="w-5 h-5" />
-                  <span>Complaints</span>
-                </NavLink>
-                <NavLink to="/admin/mess-leaves" className={linkClasses} onClick={() => setIsMobileMenuOpen(false)}>
-                  <FaUtensils className="w-5 h-5" />
-                  <span>Mess Leaves</span>
-                </NavLink>
-                <NavLink to="/admin/invoices" className={linkClasses} onClick={() => setIsMobileMenuOpen(false)}>
-                  <FaFileInvoiceDollar className="w-5 h-5" />
-                  <span>Invoices</span>
-                </NavLink>
-                <NavLink to="/admin/announcements" className={linkClasses} onClick={() => setIsMobileMenuOpen(false)}>
-                  <FaBullhorn className="w-5 h-5" />
-                  <span>Announcements</span>
-                </NavLink>
-                <NavLink to="/admin/attendance" className={linkClasses} onClick={() => setIsMobileMenuOpen(false)}>
-                  <FaClipboardCheck className="w-5 h-5" />
-                  <span>Attendance</span>
-                </NavLink>
-              </div>
+              <NavLink to="/admin/students" className={linkClasses} onClick={close}>
+                <FaUsers className="w-4 h-4 flex-shrink-0" />
+                <span>Manage Students</span>
+              </NavLink>
+              <NavLink to="/admin/bookings" className={linkClasses} onClick={close}>
+                <FaBed className="w-4 h-4 flex-shrink-0" />
+                <span>Room Bookings</span>
+              </NavLink>
+              <NavLink to="/admin/complaints" className={linkClasses} onClick={close}>
+                <FaCircleExclamation className="w-4 h-4 flex-shrink-0" />
+                <span>Complaints</span>
+              </NavLink>
+              <NavLink to="/admin/mess-leaves" className={linkClasses} onClick={close}>
+                <FaUtensils className="w-4 h-4 flex-shrink-0" />
+                <span>Mess Leaves</span>
+              </NavLink>
+              <NavLink to="/admin/mess-menu" className={linkClasses} onClick={close}>
+                <FaClipboardList className="w-4 h-4 flex-shrink-0" />
+                <span>Mess Menu</span>
+              </NavLink>
+              <NavLink to="/admin/invoices" className={linkClasses} onClick={close}>
+                <FaFileInvoiceDollar className="w-4 h-4 flex-shrink-0" />
+                <span>Invoices</span>
+              </NavLink>
+
+              <SectionTitle>Operations</SectionTitle>
+              <NavLink to="/admin/announcements" className={linkClasses} onClick={close}>
+                <FaBullhorn className="w-4 h-4 flex-shrink-0" />
+                <span>Announcements</span>
+              </NavLink>
+              <NavLink to="/admin/attendance" className={linkClasses} onClick={close}>
+                <FaClipboardCheck className="w-4 h-4 flex-shrink-0" />
+                <span>Attendance</span>
+              </NavLink>
+              <NavLink to="/admin/room-changes" className={linkClasses} onClick={close}>
+                <FaArrowRightArrowLeft className="w-4 h-4 flex-shrink-0" />
+                <span>Room Changes</span>
+              </NavLink>
             </>
           )}
         </nav>
-        
-        {/* Footer / Copyright */}
-        <div className="p-4 border-t border-slate-200 dark:border-slate-800">
-             <p className="text-xs text-center text-slate-400 dark:text-slate-500">
-               © 2025 Hostel Management
-             </p>
+
+        {/* User Card Footer */}
+        <div className="p-3 border-t border-slate-200 dark:border-slate-800">
+          <div className="flex items-center gap-3 px-2 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+            {/* Avatar */}
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow">
+              {initials}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-slate-800 dark:text-white truncate leading-none mb-1">
+                {authUser?.fullName || authUser?.name || "User"}
+              </p>
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md capitalize ${roleColor}`}>
+                {authUser?.role || "student"}
+              </span>
+            </div>
+          </div>
+          <p className="text-[10px] text-center text-slate-400 dark:text-slate-600 mt-2">
+            © 2025 Hostel Management
+          </p>
         </div>
       </aside>
     </>

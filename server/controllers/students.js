@@ -40,7 +40,7 @@ export const getStudentProfile = async (req, res) => {
 ====================================================== */
 export const updateStudentProfile = async (req, res) => {
   try {
-    const { fullName, branch, profilePic } = req.body;
+    const { fullName, branch, profilePic, parentName, parentPhone } = req.body;
     const studentId = req.user._id;
 
     const updateData = {};
@@ -48,6 +48,8 @@ export const updateStudentProfile = async (req, res) => {
     if (fullName) updateData.fullName = fullName;
     if (branch) updateData.branch = branch;
     if (profilePic) updateData.profilePic = profilePic;
+    if (parentName !== undefined) updateData.parentName = parentName;
+    if (parentPhone !== undefined) updateData.parentPhone = parentPhone;
 
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({

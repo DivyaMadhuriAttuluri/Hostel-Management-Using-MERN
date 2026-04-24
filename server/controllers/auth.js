@@ -6,14 +6,98 @@ import Admin from "../models/Admin.js";
 import StudentRegRequest from "../models/StudentRegRequest.js";
 
 import redis from "../lib/redis.js";
-import {
-  generateAccessToken,
-  generateRefreshToken,
-} from "../lib/token.js";
+import { generateAccessToken, generateRefreshToken } from "../lib/token.js";
+
+const FLOOR_PREFIX_TO_DIGIT = {
+  G: 0,
+  F: 1,
+  S: 2,
+  T: 3,
+};
+
+const FLOOR_DIGIT_TO_PREFIX = {
+  0: "G",
+  1: "F",
+  2: "S",
+  3: "T",
+};
+
+const buildRoomVariants = (roomInput) => {
+  const raw = String(roomInput || "")
+    .trim()
+    .toUpperCase();
+  if (!raw) return [];
+
+  const variants = new Set([raw]);
+
+  const prefixedMatch = raw.match(/^([GFST])\s*-\s*(\d{1,3})$/);
+  if (prefixedMatch) {
+    const prefix = prefixedMatch[1];
+    const roomNumber = Number(prefixedMatch[2]);
+    const normalizedPrefixed = `${prefix}-${roomNumber}`;
+    variants.add(normalizedPrefixed);
+
+    const floorDigit = FLOOR_PREFIX_TO_DIGIT[prefix];
+    const compactNumeric = String(floorDigit * 100 + roomNumber);
+    variants.add(compactNumeric);
+
+    if (floorDigit === 0) {
+      variants.add(String(roomNumber));
+      variants.add(String(roomNumber).padStart(3, "0"));
+    }
+  }
+
+  const numericMatch = raw.match(/^\d{1,4}$/);
+  if (numericMatch) {
+    const numericValue = Number(raw);
+
+    if (numericValue >= 100) {
+      const floorDigit = Math.floor(numericValue / 100);
+      const roomNumber = numericValue % 100;
+
+      if (FLOOR_DIGIT_TO_PREFIX[floorDigit] && roomNumber > 0) {
+        variants.add(`${FLOOR_DIGIT_TO_PREFIX[floorDigit]}-${roomNumber}`);
+      }
+    } else if (numericValue > 0) {
+      variants.add(`G-${numericValue}`);
+    }
+  }
+
+  return [...variants];
+};
+
+const toPrefixedRoom = (roomInput) => {
+  const raw = String(roomInput || "")
+    .trim()
+    .toUpperCase();
+  if (!raw) return "";
+
+  const prefixedMatch = raw.match(/^([GFST])\s*-\s*(\d{1,3})$/);
+  if (prefixedMatch) {
+    return `${prefixedMatch[1]}-${Number(prefixedMatch[2])}`;
+  }
+
+  if (!/^\d{1,4}$/.test(raw)) return raw;
+
+  const numericValue = Number(raw);
+  if (numericValue >= 100) {
+    const floorDigit = Math.floor(numericValue / 100);
+    const roomNumber = numericValue % 100;
+
+    if (FLOOR_DIGIT_TO_PREFIX[floorDigit] && roomNumber > 0) {
+      return `${FLOOR_DIGIT_TO_PREFIX[floorDigit]}-${roomNumber}`;
+    }
+  }
+
+  if (numericValue > 0) {
+    return `G-${numericValue}`;
+  }
+
+  return raw;
+};
 
 /* ======================================================
    STUDENT REGISTRATION REQUEST
-   (NO TOKEN CHANGES HERE)
 ====================================================== */
 export const registerStudent = async (req, res) => {
   try {
@@ -25,6 +109,9 @@ export const registerStudent = async (req, res) => {
       hostelBlock,
       roomNO,
       password,
+      parentName,
+      parentPhone,
+      bloodGroup,
     } = req.body;
 
     if (
@@ -39,8 +126,34 @@ export const registerStudent = async (req, res) => {
       return res.status(400).json({ message: "All fields are required" });
     }
 
+    const roomVariants = buildRoomVariants(roomNO);
+    const normalizedRoomNO = toPrefixedRoom(roomNO);
+
+    const existingRoomAllocation = await User.findOne({
+      hostelBlock,
+      roomNO: { $in: roomVariants },
+    });
+
+    if (existingRoomAllocation) {
+      return res
+        .status(400)
+        .json({ message: "This room is already allocated" });
+    }
+
+    const existingPendingRoomRequest = await StudentRegRequest.findOne({
+      hostelBlock,
+      status: "pending",
+      roomNO: { $in: roomVariants },
+    });
+
+    if (existingPendingRoomRequest) {
+      return res
+        .status(400)
+        .json({ message: "This room already has a pending request" });
+    }
+
     const existingStudent = await User.findOne({
-      $or: [{ studentID }, { collegeEmail }, { hostelBlock, roomNO }],
+      $or: [{ studentID }, { collegeEmail }],
     });
 
     if (existingStudent) {
@@ -66,8 +179,11 @@ export const registerStudent = async (req, res) => {
       branch,
       collegeEmail,
       hostelBlock,
-      roomNO,
+      roomNO: normalizedRoomNO,
       password: hashedPassword,
+      parentName: parentName || "",
+      parentPhone: parentPhone || "",
+      bloodGroup: bloodGroup || "",
     });
 
     res.status(201).json({
@@ -76,6 +192,42 @@ export const registerStudent = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+/* ======================================================
+   GET UNAVAILABLE ROOMS FOR REGISTRATION
+====================================================== */
+export const getUnavailableRooms = async (req, res) => {
+  try {
+    const { hostelBlock } = req.query;
+
+    if (!hostelBlock) {
+      return res
+        .status(400)
+        .json({ success: false, message: "hostelBlock is required" });
+    }
+
+    const [allocatedRooms, pendingRooms] = await Promise.all([
+      User.find({ hostelBlock }).select("roomNO -_id"),
+      StudentRegRequest.find({ hostelBlock, status: "pending" }).select(
+        "roomNO -_id",
+      ),
+    ]);
+
+    const unavailableRoomSet = new Set();
+
+    for (const entry of [...allocatedRooms, ...pendingRooms]) {
+      const normalized = toPrefixedRoom(entry.roomNO);
+      if (normalized) unavailableRoomSet.add(normalized);
+    }
+
+    return res.json({
+      success: true,
+      rooms: [...unavailableRoomSet],
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -106,7 +258,6 @@ export const loginStudent = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    // 🔑 NEW TOKEN LOGIC
     const accessToken = generateAccessToken({
       _id: student._id,
       role: "student",
@@ -116,12 +267,11 @@ export const loginStudent = async (req, res) => {
       _id: student._id,
     });
 
-    // store refresh token in redis
     await redis.set(
       `refresh:${student._id}`,
       refreshToken,
       "EX",
-      7 * 24 * 60 * 60
+      7 * 24 * 60 * 60,
     );
 
     res.cookie("refreshToken", refreshToken, {
@@ -182,7 +332,7 @@ export const loginAdmin = async (req, res) => {
       `refresh:${admin._id}`,
       refreshToken,
       "EX",
-      7 * 24 * 60 * 60
+      7 * 24 * 60 * 60,
     );
 
     res.cookie("refreshToken", refreshToken, {
@@ -214,7 +364,6 @@ export const logoutUser = async (req, res) => {
   const refreshToken = req.cookies.refreshToken;
   if (refreshToken) {
     const payload = jwt.decode(refreshToken);
-    // generateRefreshToken signs with { userId: ... }, so decoded key is 'userId'
     if (payload?.userId) {
       await redis.del(`refresh:${payload.userId}`);
     }
@@ -248,7 +397,6 @@ export const getMe = async (req, res) => {
 ====================================================== */
 export const refreshToken = async (req, res) => {
   try {
-    // 1️⃣ Get refresh token from HttpOnly cookie
     const refreshToken = req.cookies.refreshToken;
 
     if (!refreshToken) {
@@ -258,14 +406,8 @@ export const refreshToken = async (req, res) => {
       });
     }
 
-    // 2️⃣ Verify refresh token signature
-    const decoded = jwt.verify(
-      refreshToken,
-      process.env.REFRESH_TOKEN_SECRET
-    );
+    const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
 
-    // 3️⃣ Check Redis to see if refresh token is still valid
-    // generateRefreshToken signs with { userId: ... }, so decoded key is 'userId'
     const storedToken = await redis.get(`refresh:${decoded.userId}`);
 
     if (!storedToken || storedToken !== refreshToken) {
@@ -275,7 +417,6 @@ export const refreshToken = async (req, res) => {
       });
     }
 
-    // 4️⃣ Find user to determine role
     let user =
       (await User.findById(decoded.userId)) ||
       (await Admin.findById(decoded.userId));
@@ -287,7 +428,6 @@ export const refreshToken = async (req, res) => {
       });
     }
 
-    // 5️⃣ Issue new access token
     const newAccessToken = generateAccessToken({
       _id: user._id,
       role: user.adminID ? "admin" : "student",
@@ -304,4 +444,3 @@ export const refreshToken = async (req, res) => {
     });
   }
 };
-

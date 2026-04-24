@@ -1,5 +1,7 @@
 import Complaint from '../models/Complaint.js'
 import { notify } from '../lib/notify.js'
+import { sendGenericEmail } from '../lib/sendEmail.js'
+import User from '../models/User.js'
 
 export const createComplaintByStudent = async (req, res) => {
     try{
@@ -136,6 +138,30 @@ export const resolveComplaint = async (req, res) => {
     }
 }
 
+// Send email helper for complaint status changes
+const sendComplaintEmail = async (studentId, complaint, status) => {
+  try {
+    const student = await User.findById(studentId).select('collegeEmail fullName');
+    if (student?.collegeEmail) {
+      const { sendGenericEmail } = await import('../lib/sendEmail.js');
+      await sendGenericEmail({
+        to: student.collegeEmail,
+        subject: `Complaint ${status === 'resolved' ? 'Resolved ✅' : 'Updated'} — Hostel Management`,
+        html: `
+          <h2>Complaint ${status === 'resolved' ? 'Resolved' : 'Status Updated'}</h2>
+          <p>Hello <b>${student.fullName}</b>,</p>
+          <p>Your <b>${complaint.category}</b> complaint has been <b>${status}</b>.</p>
+          <p><b>Description:</b> ${complaint.description}</p>
+          <br/>
+          <p>Regards,<br/>Hostel Administration</p>
+        `,
+      });
+    }
+  } catch (err) {
+    console.error('Complaint email error:', err.message);
+  }
+};
+
 // Generic status updater for admin to support frntd
 export const updateComplaintStatus = async (req, res) => {
   try {
@@ -143,7 +169,7 @@ export const updateComplaintStatus = async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    const { status } = req.body;
+    const { status, resolutionNote } = req.body;
     const allowedStatuses = ["pending", "accepted", "resolved"];
     if (!allowedStatuses.includes(status)) {
       return res.status(400).json({ message: "Invalid status" });
@@ -159,15 +185,17 @@ export const updateComplaintStatus = async (req, res) => {
     }
 
     complaint.status = status;
+    if (resolutionNote) complaint.resolutionNote = resolutionNote;
     await complaint.save();
 
     // 🔔 Notify student when resolved
     if (status === "resolved") {
+      const noteMsg = resolutionNote ? ` Note: ${resolutionNote}` : "";
       await notify({
         studentId: complaint.student,
         type: "complaint",
         title: "Complaint Resolved ✅",
-        message: `Your ${complaint.category} complaint has been marked as resolved by the admin.`,
+        message: `Your ${complaint.category} complaint has been marked as resolved by the admin.${noteMsg}`,
         refId: complaint._id,
       });
     }

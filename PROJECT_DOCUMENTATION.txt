@@ -1,0 +1,796 @@
+================================================================================
+     HOSTEL MANAGEMENT SYSTEM — COMPLETE PROJECT DOCUMENTATION
+================================================================================
+     Built Using the MERN Stack (MongoDB, Express.js, React.js, Node.js)
+================================================================================
+
+
+================================================================================
+  1. PROJECT OVERVIEW
+================================================================================
+
+This is a full-stack Hostel Management System built using the MERN stack. It
+allows two types of users — Students and Admins — to manage all aspects of
+hostel life digitally. The system is organized around "hostel blocks," where
+each admin manages students belonging to their specific block only.
+
+The architecture follows a client-server model:
+  - Frontend (Client): React.js SPA served via Vite dev server (port 5173)
+  - Backend (Server):  Express.js REST API (port 5000)
+  - Database:          MongoDB Atlas (cloud-hosted NoSQL database)
+  - Cache/Session:     Redis (for refresh tokens and OTP storage)
+
+Two user roles exist in the system:
+  1. STUDENT — Registers, gets approved by admin, then accesses hostel services
+  2. ADMIN   — One admin per hostel block, manages all students in that block
+
+
+================================================================================
+  2. TECHNOLOGIES USED & WHERE THEY ARE USED
+================================================================================
+
+------------------------------------------------------------------------------
+  2.1 FRONTEND TECHNOLOGIES (client/)
+------------------------------------------------------------------------------
+
+TECHNOLOGY           | WHERE / HOW IT IS USED
+---------------------|----------------------------------------------------------
+React.js (v18)       | The entire frontend UI is built as a React Single Page
+                     | Application (SPA). Every page (Dashboard, Profile, 
+                     | Complaints, Bookings, etc.) is a React component.
+                     | Files: All .jsx files under client/src/
+                     |
+Vite (v7)            | Used as the build tool and dev server for the React app.
+                     | Provides fast Hot Module Replacement (HMR) during 
+                     | development and optimized production builds.
+                     | Config: vite.config.js, runs via "npm run dev"
+                     |
+React Router DOM     | Handles all client-side routing and navigation.
+(v6)                 | Defines public routes (/home, /login, /register), 
+                     | student routes (/student/*), and admin routes (/admin/*).
+                     | Protected routes check authentication and role before
+                     | rendering.
+                     | File: client/src/routes/AppRoutes.jsx
+                     |
+Axios (v1.13)        | Makes all HTTP requests from frontend to backend API.
+                     | Configured with a base URL, automatic cookie handling
+                     | (withCredentials: true), request interceptor to attach
+                     | Bearer access tokens, and response interceptor that
+                     | auto-refreshes expired tokens on 401 errors.
+                     | File: client/src/api/axios.js
+                     |       client/src/api/*.api.js (12 API module files)
+                     |
+Tailwind CSS (v3)    | Utility-first CSS framework used for styling all UI
+                     | components. Provides responsive design, dark mode 
+                     | support, glassmorphism effects, and modern aesthetics.
+                     | Config: tailwind.config.js, postcss.config.js
+                     |
+Framer Motion        | Used for page transitions, animations, and micro-
+(v10)                | interactions across the UI. Provides smooth enter/exit
+                     | animations on components, hover effects, and dynamic
+                     | UI feel.
+                     | Used in: Landing page, Dashboard, Sidebar, forms, etc.
+                     |
+Recharts (v2.8)      | Charting library used on both Student and Admin 
+                     | dashboards. Renders:
+                     | - Bar charts for weekly attendance trends
+                     | - Pie/Donut charts for complaint distribution by status
+                     | - Line charts for attendance statistics
+                     | Used in: Dashboard.jsx, AdminDashboard.jsx
+                     |
+React Hot Toast      | Provides beautiful toast notifications (success, error,
+(v2.6)               | loading states) across the app. Shows feedback for
+                     | login, logout, form submissions, approvals, etc.
+                     | File: App.jsx (global Toaster component)
+                     |
+React Icons (v4.12)  | Icon library used throughout the UI. Provides FontAwesome
+                     | 6, Heroicons, and other icon sets for navigation, buttons,
+                     | status indicators, and decorative elements.
+                     | Used in: Sidebar, Navbar, all pages
+                     |
+Lucide React         | Additional modern icon set used alongside React Icons
+(v0.554)             | for certain UI components and decorative elements.
+                     |
+clsx (v2.1)          | Utility for conditionally joining CSS class names.
+                     | Used across components for dynamic class application
+                     | based on state (active tabs, selected items, etc.)
+                     |
+Context API          | React's built-in state management used for:
+                     | - AuthContext/AuthProvider: Global auth state (user, 
+                     |   token, login/logout functions)
+                     | - ThemeContext: Dark/light theme toggle
+                     | Files: client/src/context/AuthProvider.jsx
+                     |        client/src/context/ThemeContext.jsx
+
+------------------------------------------------------------------------------
+  2.2 BACKEND TECHNOLOGIES (server/)
+------------------------------------------------------------------------------
+
+TECHNOLOGY           | WHERE / HOW IT IS USED
+---------------------|----------------------------------------------------------
+Node.js              | The runtime environment for the entire backend server.
+                     | Runs the Express app, handles all API requests, and 
+                     | connects to MongoDB and Redis.
+                     |
+Express.js (v4.18)   | The web framework powering the REST API. Handles:
+                     | - 13 route groups (auth, students, admin, complaints,
+                     |   attendance, mess-leave, invoices, room-booking,
+                     |   registration, announcements, notifications, 
+                     |   room-change, mess-menu)
+                     | - Middleware chain (CORS, rate limiting, cookie parsing,
+                     |   JSON parsing, auth verification)
+                     | - Global error handling
+                     | File: server/server.js
+                     |
+Mongoose (v7.8)      | MongoDB ODM (Object Document Mapper). Defines all 13
+                     | data schemas and models:
+                     | - User, Admin, StudentRegRequest, Complaint, Attendance,
+                     |   MessLeave, MessMenu, Invoice, RoomBook, GuestRoom,
+                     |   RoomChangeRequest, Announcement, Notification
+                     | Handles data validation, indexing, relationships (refs),
+                     | and database queries via .find(), .create(), .aggregate()
+                     | Files: server/models/*.js (13 model files)
+                     |
+MongoDB (Atlas)      | The NoSQL database storing all application data.
+                     | Connected via Mongoose using MONGODB_URI from .env.
+                     | Stores users, complaints, bookings, invoices, menus,
+                     | attendance records, notifications, etc.
+                     | File: server/lib/db.js
+                     |
+Redis (via ioredis)  | In-memory data store used for:
+                     | 1. Refresh Token Storage — Each user's refresh token
+                     |    is stored with key "refresh:{userId}" with 7-day TTL
+                     | 2. OTP Storage — Forgot-password OTPs stored with key
+                     |    "otp:{email}" with 10-minute TTL
+                     | Provides fast token validation and auto-expiry.
+                     | File: server/lib/redis.js
+                     |
+JSON Web Tokens      | Used for the dual-token authentication system:
+(jsonwebtoken v9)    | - Access Token: Short-lived (15 min), sent in 
+                     |   Authorization header, verified on every protected route
+                     | - Refresh Token: Long-lived (7 days), stored in 
+                     |   HTTP-only cookie, used to get new access tokens
+                     | Files: server/lib/token.js (generation)
+                     |        server/middleware/auth.js (verification)
+                     |        server/controllers/auth.js (login/refresh flows)
+                     |
+bcryptjs (v2.4)      | Hashes all user passwords before storing in database.
+                     | Used during registration (hash), login (compare), and
+                     | password change/reset flows.
+                     | Files: server/controllers/auth.js
+                     |        server/controllers/students.js
+                     |        server/controllers/adminProfile.js
+                     |        server/controllers/passwordRecovery.js
+                     |
+Passport.js (v0.7)   | Authentication middleware for Google OAuth 2.0 login.
++ passport-google-   | Configured with GoogleStrategy. When a student logs in
+  oauth20 (v2.0)     | via Google, it looks up their college email in the
+                     | database. Only pre-registered & approved students can
+                     | use Google login.
+                     | File: server/lib/passport.js
+                     |
+Nodemailer (v7)      | Sends transactional emails via Gmail SMTP:
+                     | - Registration approval/rejection emails
+                     | - Forgot password OTP emails  
+                     | - Mess leave approval emails
+                     | - Complaint resolution emails
+                     | File: server/lib/sendEmail.js
+                     |
+express-rate-limit   | API security middleware with 3 tiers:
+(v8)                 | - Global: 200 requests per 15 min per IP (all routes)
+                     | - Auth: 15 attempts per 15 min (login/register routes)
+                     | - Sensitive: 5 requests per hour (OTP/password routes)
+                     | File: server/middleware/rateLimiter.js
+                     |
+CORS (v2.8)          | Configured to allow only the frontend origin 
+                     | (FRONTEND_URL from .env) with credentials support.
+                     | Blocks unauthorized cross-origin requests.
+                     | File: server/server.js
+                     |
+cookie-parser (v1.4) | Parses cookies from incoming requests. Required for
+                     | reading the HTTP-only refresh token cookie during
+                     | token refresh and logout operations.
+                     | File: server/server.js
+                     |
+dotenv (v16.6)       | Loads environment variables from .env file:
+                     | MONGODB_URI, ACCESS_TOKEN_SECRET, REFRESH_TOKEN_SECRET,
+                     | GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, 
+                     | GOOGLE_CALLBACK_URL, NODEMAILER_EMAIL, NODEMAILER_PASS,
+                     | FRONTEND_URL, PORT
+                     |
+Nodemon (v3, dev)    | Auto-restarts the server during development when files
+                     | change. Used via "npm run dev" script.
+
+------------------------------------------------------------------------------
+  2.3 DATABASE SCHEMAS (13 MongoDB Collections)
+------------------------------------------------------------------------------
+
+COLLECTION                  | PURPOSE
+----------------------------|------------------------------------------------
+User                        | Student accounts (fullName, studentID, branch,
+                            | collegeEmail, hostelBlock, roomNO, password,
+                            | isApproved, parentName, parentPhone, bloodGroup)
+Admin                       | Admin accounts (adminID, name, email, password,
+                            | hostelBlock — one admin per block)
+StudentRegistrationRequest  | Pending registration requests (same fields as
+                            | User + status: pending/approved/rejected)
+Complaint                   | Student complaints (category, description,
+                            | status, resolutionDate, resolutionNote)
+Attendance                  | Daily attendance records (student, date, status:
+                            | present/absent)
+MessLeave                   | Mess leave requests (startDate, endDate, reason,
+                            | status: pending/approved/rejected)
+MessMenu                    | Weekly mess menu (day, breakfast, lunch, snacks,
+                            | dinner — one entry per day per block)
+Invoice                     | Fee invoices (title, description, amount, 
+                            | dueDate, status: pending/paid, isBroadcast)
+RoomBook                    | Guest room booking requests (visitorName,
+                            | relation, guestRoomNO, dateFrom, dateTo,
+                            | purpose, status: pending/approved/rejected)
+GuestRoom                   | Guest hostel room inventory (100 rooms)
+RoomChangeRequest           | Room change requests (currentRoomNO,
+                            | requestedRoomNO, reason, status, adminRemarks)
+Announcement                | Hostel announcements (title, message, block)
+Notification                | In-app notifications (type, title, message,
+                            | isRead — for complaints, bookings, invoices,
+                            | mess leave updates)
+
+
+================================================================================
+  3. FEATURES — STUDENT USER
+================================================================================
+
+3.1  REGISTRATION & LOGIN
+     - Register with: Full Name, Student ID, Branch, College Email, Hostel
+       Block, Room Number, Password, Parent Name, Parent Phone, Blood Group
+     - Registration goes to "pending" state — must be approved by block admin
+     - Login via Student ID + Password (only after admin approval)
+     - Login via Google OAuth 2.0 (using college email, must be pre-approved)
+     - Check Registration Status page (public — no login needed)
+     - Forgot Password with email OTP verification (OTP sent via Nodemailer,
+       stored in Redis with 10-min expiry)
+
+3.2  STUDENT DASHBOARD
+     - Overview cards showing: Total Attendance, Active Complaints, Mess 
+       Leave Days
+     - Attendance Trend chart (last 7 days bar chart via Recharts)
+     - Complaints by Category (pie chart via Recharts)
+     - Recent Announcements list (latest 5 from their hostel block)
+     - Recent Approved Mess Leaves list
+
+3.3  PROFILE MANAGEMENT
+     - View full profile (name, student ID, branch, email, hostel block,
+       room number, parent info, blood group)
+     - Edit profile (update name, branch, parent name, parent phone)
+     - Change Password (requires current password verification)
+
+3.4  COMPLAINT SYSTEM
+     - File new complaints with category selection:
+       Electricity, Water, Mess, Fans, Lightbulb, Other
+     - Add detailed description for each complaint
+     - View all personal complaints with status tracking:
+       Pending → Accepted → Resolved
+     - Receive in-app notifications when complaint is resolved
+     - Receive email notifications on complaint status changes
+
+3.5  GUEST ROOM BOOKING
+     - Browse 100 guest hostel rooms with real-time availability
+     - Select date range (from - to) to check availability
+     - Room status visualization: Available / Booked / Pending
+     - Book a room by providing: Visitor Name, Relation, Room Number,
+       Date Range, Purpose
+     - Conflict detection prevents double-booking approved rooms
+     - View all personal bookings (My Bookings page)
+     - Receive notification when booking is approved
+
+3.6  MESS LEAVE MANAGEMENT
+     - Apply for mess leave with: Start Date, End Date, Reason
+     - Date validation (end date must be after start date)
+     - View all personal mess leave requests with status tracking
+     - Statuses: Pending → Approved / Rejected
+     - Receive in-app notification + email when leave is approved
+
+3.7  INVOICES & FEES
+     - View all personal invoices (individual + block-wide broadcast invoices)
+     - See invoice details: Title, Description, Amount (₹), Due Date, Status
+     - Track payment status: Pending / Paid
+     - Receive notification when new invoice is generated
+
+3.8  ANNOUNCEMENTS
+     - View all announcements posted by hostel block admin
+     - Announcements sorted by newest first
+     - Also shown on dashboard (latest 5)
+
+3.9  MESS MENU
+     - View weekly mess menu for their hostel block
+     - Organized by day (Monday–Sunday)
+     - Shows: Breakfast, Lunch, Snacks, Dinner for each day
+
+3.10 ATTENDANCE
+     - View personal attendance history (last 30 records)
+     - Track present/absent records by date
+
+3.11 ROOM CHANGE REQUEST
+     - Submit a room change request with: Desired Room Number, Reason
+     - System checks if requested room is available (not occupied)
+     - Only one pending request allowed at a time
+     - View all personal room change requests and their status
+     - Receive notification when approved (room auto-updated) or rejected
+       (with admin remarks)
+
+3.12 NOTIFICATIONS
+     - In-app notification bell with unread count badge
+     - Notifications for: Complaints resolved, Bookings approved, Invoices
+       generated, Mess leaves approved, Room changes approved/rejected
+     - Mark all as read / Mark individual as read
+     - Latest 50 notifications displayed
+
+
+================================================================================
+  4. FEATURES — ADMIN USER
+================================================================================
+
+4.1  ADMIN LOGIN
+     - Login via Admin ID + Password (pre-seeded admin accounts)
+     - Each admin is assigned to one hostel block (1 admin per block)
+     - All admin operations are scoped to their hostel block only
+
+4.2  ADMIN DASHBOARD
+     - Overview stat cards showing:
+       • Total Students in block
+       • Pending Guest Room Bookings
+       • Open Complaints (pending + accepted)
+       • Pending Mess Leave Requests
+     - Complaints Distribution donut chart (Resolved / Pending / In Progress)
+     - Weekly Attendance bar chart (last 7 days, present count per day)
+     - All data is block-scoped via MongoDB aggregation pipelines
+
+4.3  MANAGE STUDENTS
+     - View all registered students in their hostel block
+     - View individual student full details (profile + all their complaints,
+       attendance, mess leaves, invoices, guest room bookings)
+     - Approve pending registration requests → Creates User account + sends
+       approval email to student's college email
+     - Reject registration requests → With reason + sends rejection email
+     - Soft-delete (deactivate) students (sets isActive=false, isApproved=false)
+     - Reactivate previously deactivated students
+
+4.4  MANAGE COMPLAINTS
+     - View all complaints from students in their block
+     - Complaints show: Student Name, Room Number, Category, Description,
+       Status, Date
+     - Accept complaint and set resolution date/time
+     - Mark complaint as resolved (with optional resolution note)
+     - Update complaint status (pending/accepted/resolved)
+     - On resolution: auto-sends in-app notification to student
+
+4.5  MANAGE GUEST ROOM BOOKINGS
+     - View all booking requests from students in their block
+     - See booking details: Student info, Visitor Name, Relation, Room,
+       Date Range, Purpose, Status
+     - Approve or Reject bookings
+     - Block-level authorization check (admin can only manage their block's
+       students' bookings)
+     - On approval: auto-sends in-app notification to student
+
+4.6  MANAGE MESS LEAVES
+     - View all mess leave requests from students in their block
+     - See details: Student info, Start/End Date, Reason, Status
+     - Approve or Reject leave requests
+     - On approval: auto-sends in-app notification + email to student
+
+4.7  MANAGE INVOICES
+     - Create TARGETED invoice for a specific student
+       (by Student ID, with title, description, amount, due date)
+     - Create BROADCAST invoice for ALL students in the block at once
+       (generates individual invoice copy for each student)
+     - View all invoices in the block with student details
+     - Mark invoices as PAID
+     - On creation: auto-sends in-app notification to student(s)
+
+4.8  MANAGE ANNOUNCEMENTS
+     - Create new announcements with title and message
+     - View all announcements for their block (sorted newest first)
+     - Announcements are automatically visible to all students in the block
+
+4.9  MANAGE MESS MENU
+     - Set/Update weekly mess menu for their block
+     - For each day (Monday–Sunday): Breakfast, Lunch, Snacks, Dinner
+     - Upsert logic: creates new entry or updates existing for that day
+     - Delete individual menu entries
+     - One entry per day per block enforced by database index
+
+4.10 MANAGE ATTENDANCE
+     - Record attendance for any student in their block
+       (by Student ID, Date, Status: present/absent)
+     - View all attendance records for the block
+     - View attendance for a specific date
+     - View attendance statistics per student:
+       Total records, Present count, Absent count, Attendance percentage
+
+4.11 MANAGE ROOM CHANGES
+     - View all room change requests from students in their block
+     - See details: Student info, Current Room, Requested Room, Reason
+     - Approve room change → Automatically updates student's room number
+       in database + sends notification
+     - Reject room change → With admin remarks + sends notification
+
+4.12 ADMIN PROFILE MANAGEMENT
+     - View admin profile (name, adminID, email, hostel block)
+     - Update profile (name, email)
+     - Change password (requires current password verification)
+
+
+================================================================================
+  5. AUTHENTICATION & SECURITY SYSTEM
+================================================================================
+
+5.1  DUAL-TOKEN JWT AUTHENTICATION
+     - Access Token (15 min expiry):
+       • Stored in-memory on frontend (not localStorage — XSS safe)
+       • Sent via Authorization: Bearer header on every API request
+       • Contains: userId, role (student/admin)
+       • Verified by protectRoute middleware on protected API routes
+     - Refresh Token (7 day expiry):
+       • Stored in HTTP-only cookie (not accessible to JavaScript — XSS safe)
+       • Also stored in Redis with same TTL for server-side validation
+       • Used to silently get new access tokens when they expire
+       • Auto-refresh handled by Axios response interceptor on 401
+
+5.2  GOOGLE OAUTH 2.0
+     - Students can login using Google with their college email
+     - Passport.js GoogleStrategy looks up existing User by email
+     - Only approved users can login via Google (isApproved check)
+     - Returns JWT tokens same as normal login flow
+     - OAuth success redirect handled by OAuthSuccess.jsx page
+
+5.3  ROLE-BASED ACCESS CONTROL (RBAC)
+     - ProtectedRoute component on frontend: checks authentication + role
+       before rendering any route (student vs admin)
+     - authorize middleware on backend: checks req.role from JWT
+     - Every controller function validates role at the beginning
+     - Block-level scoping: admins can only access data from their own
+       hostel block (checked via hostelBlock field matching)
+
+5.4  RATE LIMITING (3 Tiers)
+     - Global: 200 requests / 15 min / IP (all API routes)
+     - Auth: 15 requests / 15 min / IP (login, register routes)  
+     - Sensitive: 5 requests / 1 hour / IP (forgot password, OTP)
+
+5.5  PASSWORD SECURITY
+     - All passwords hashed with bcryptjs (10 salt rounds)
+     - Password comparison done server-side only
+     - Forgot password flow:
+       1. Student submits college email
+       2. Server generates 6-digit OTP → stores in Redis (10 min TTL)
+       3. OTP sent to email via Nodemailer
+       4. Student submits OTP + new password
+       5. Server verifies OTP from Redis → updates password → deletes OTP
+
+5.6  CORS POLICY
+     - Only configured frontend URL allowed (FRONTEND_URL from .env)
+     - Credentials enabled for cookie-based refresh token flow
+     - All other origins rejected with error
+
+
+================================================================================
+  6. NOTIFICATION SYSTEM
+================================================================================
+
+Two notification channels work in parallel:
+
+6.1  IN-APP NOTIFICATIONS (MongoDB-backed)
+     - Created via notify() utility in server/lib/notify.js
+     - Stored in Notification collection with: student ref, type, title,
+       message, isRead flag, optional refId for deep-linking
+     - Types: complaint, mess_leave, booking, invoice
+     - Frontend fetches via GET /api/notifications with unread count
+     - Mark individual or all notifications as read
+     - Notifications are silent (no push) — polled by frontend
+
+6.2  EMAIL NOTIFICATIONS (Nodemailer via Gmail SMTP)
+     - Registration approved/rejected → Email to student
+     - Mess leave approved → Email to student  
+     - Complaint resolved → Email to student
+     - Password reset OTP → Email to student
+     - Sent as HTML emails with styled content
+
+
+================================================================================
+  7. DATA SEEDING SYSTEM
+================================================================================
+
+The project includes seed scripts for demo/testing data:
+
+- seedUsers.js       : Creates admin and student accounts for all blocks
+- seedGuestRooms.js  : Creates 100 guest hostel rooms
+- seedFullDataset.js : Creates complete dataset including complaints,
+                       bookings, invoices, attendance, mess leaves,
+                       announcements, mess menus, notifications
+
+Run via: npm run seed:users / npm run seed:rooms / npm run seed:full
+Credentials logged to: server/scripts/seeded-credentials.txt
+
+
+================================================================================
+  8. PROJECT FOLDER STRUCTURE
+================================================================================
+
+Hostel-Management-Using-MERN/
+├── client/                          # FRONTEND (React + Vite)
+│   ├── src/
+│   │   ├── api/                     # Axios instance + 12 API modules
+│   │   │   ├── axios.js             # Base config, interceptors, auto-refresh
+│   │   │   ├── auth.api.js          # Login, register, logout, refresh APIs
+│   │   │   ├── admin.api.js         # Admin dashboard stats API
+│   │   │   ├── announcement.api.js  # Announcement CRUD APIs
+│   │   │   ├── booking.api.js       # Room booking APIs
+│   │   │   ├── complaint.api.js     # Complaint CRUD APIs
+│   │   │   ├── invoice.api.js       # Invoice APIs
+│   │   │   ├── messLeave.api.js     # Mess leave APIs
+│   │   │   ├── messMenu.api.js      # Mess menu APIs
+│   │   │   ├── notifications.api.js # Notification APIs
+│   │   │   ├── roomChange.api.js    # Room change APIs
+│   │   │   └── user.api.js          # Student profile/dashboard APIs
+│   │   │
+│   │   ├── components/
+│   │   │   ├── booking/             # BookingForm, RoomCard components
+│   │   │   ├── common/              # Button, Input, Loader (reusable)
+│   │   │   └── layout/              # DashboardLayout, Navbar, Sidebar,
+│   │   │                            # ProtectedRoute
+│   │   │
+│   │   ├── context/
+│   │   │   ├── AuthContext.jsx       # Auth context creation
+│   │   │   ├── AuthProvider.jsx      # Auth state, login, logout, token mgmt
+│   │   │   └── ThemeContext.jsx      # Dark/light theme toggle
+│   │   │
+│   │   ├── hooks/
+│   │   │   ├── useApi.js            # Custom hook for API calls with loading
+│   │   │   └── useFormSubmit.js     # Custom hook for form submissions
+│   │   │
+│   │   ├── pages/
+│   │   │   ├── admin/               # 12 admin pages
+│   │   │   │   ├── AdminDashboard.jsx
+│   │   │   │   ├── AdminProfile.jsx
+│   │   │   │   ├── AdminChangePassword.jsx
+│   │   │   │   ├── Attendance.jsx
+│   │   │   │   ├── ManageAnnouncements.jsx
+│   │   │   │   ├── ManageBookings.jsx
+│   │   │   │   ├── ManageComplaints.jsx
+│   │   │   │   ├── ManageInvoices.jsx
+│   │   │   │   ├── ManageMessLeaves.jsx
+│   │   │   │   ├── ManageMessMenu.jsx
+│   │   │   │   ├── ManageRoomChanges.jsx
+│   │   │   │   └── ManageStudents.jsx
+│   │   │   │
+│   │   │   ├── auth/                # 5 auth pages
+│   │   │   │   ├── Login.jsx
+│   │   │   │   ├── Register.jsx
+│   │   │   │   ├── ForgotPassword.jsx
+│   │   │   │   ├── OAuthSuccess.jsx
+│   │   │   │   └── RegistrationStatus.jsx
+│   │   │   │
+│   │   │   ├── common/              # 2 shared pages
+│   │   │   │   ├── LandingPage.jsx
+│   │   │   │   └── UnderConstruction.jsx
+│   │   │   │
+│   │   │   └── student/             # 12 student pages
+│   │   │       ├── Dashboard.jsx
+│   │   │       ├── Profile.jsx
+│   │   │       ├── ChangePassword.jsx
+│   │   │       ├── Complaints.jsx
+│   │   │       ├── GuestRoomBooking.jsx
+│   │   │       ├── MyBookings.jsx
+│   │   │       ├── MessLeaves.jsx
+│   │   │       ├── MessMenu.jsx
+│   │   │       ├── MyInvoices.jsx
+│   │   │       ├── Announcements.jsx
+│   │   │       ├── RoomChange.jsx
+│   │   │       └── StudentAttendance.jsx
+│   │   │
+│   │   ├── routes/
+│   │   │   └── AppRoutes.jsx        # All route definitions
+│   │   │
+│   │   ├── styles/
+│   │   │   └── index.css            # Global CSS + Tailwind imports
+│   │   │
+│   │   ├── App.jsx                  # Root component (ThemeProvider + Toaster)
+│   │   └── main.jsx                 # Entry point (React DOM render)
+│   │
+│   └── package.json
+│
+├── server/                          # BACKEND (Express + Node.js)
+│   ├── controllers/                 # 15 controller files (business logic)
+│   │   ├── auth.js                  # Register, login, logout, refresh, getMe
+│   │   ├── admin.js                 # Dashboard stats, student CRUD, approvals
+│   │   ├── adminProfile.js          # Admin profile and password
+│   │   ├── students.js              # Student profile, password, dashboard
+│   │   ├── complaints.js            # Complaint CRUD + status updates
+│   │   ├── attendance.js            # Record, view, stats, by-date
+│   │   ├── messLeave.js             # Apply, view, approve, reject
+│   │   ├── messMenu.js              # Get, upsert, delete menus
+│   │   ├── invoices.js              # Create (targeted/broadcast), mark paid
+│   │   ├── roomBooking.js           # Available rooms, book, approve/reject
+│   │   ├── roomChange.js            # Request, view, approve/reject
+│   │   ├── announcement.js          # Create, view (student/admin)
+│   │   ├── notifications.js         # Get, mark read
+│   │   ├── passwordRecovery.js      # Forgot password, reset, reg status
+│   │   └── StudentRegRequest.js     # Submit registration request
+│   │
+│   ├── models/                      # 13 Mongoose schemas
+│   │   ├── User.js, Admin.js, StudentRegRequest.js
+│   │   ├── Complaint.js, Attendance.js, MessLeave.js, MessMenu.js
+│   │   ├── Invoice.js, RoomBook.js, GuestRoom.js
+│   │   ├── RoomChangeRequest.js, Announcement.js, Notification.js
+│   │
+│   ├── routes/                      # 13 Express route files
+│   │   ├── auth.js, admin.js, students.js, complaints.js
+│   │   ├── attendance.js, messLeave.js, messMenu.js, invoices.js
+│   │   ├── roomBooking.js, roomChange.js, registration.js
+│   │   ├── announcements.js, notifications.js
+│   │
+│   ├── middleware/
+│   │   ├── auth.js                  # JWT access token verification
+│   │   ├── authorize.js             # Role-based authorization
+│   │   └── rateLimiter.js           # 3-tier rate limiting
+│   │
+│   ├── lib/                         # Utility modules
+│   │   ├── db.js                    # MongoDB connection
+│   │   ├── redis.js                 # Redis connection (with graceful fallback)
+│   │   ├── token.js                 # JWT access/refresh token generation
+│   │   ├── passport.js              # Google OAuth strategy
+│   │   ├── sendEmail.js             # Nodemailer email sender
+│   │   ├── notify.js                # In-app notification creator
+│   │   ├── errorHandler.js          # Global error handler middleware
+│   │   └── response.js              # Standard response helpers
+│   │
+│   ├── scripts/                     # Database seeding
+│   │   ├── seedUsers.js             # Seed admin + student accounts
+│   │   ├── seedGuestRooms.js        # Seed 100 guest rooms
+│   │   ├── seedFullDataset.js       # Seed complete demo data
+│   │   └── seeded-credentials.txt   # Login credentials for seeded users
+│   │
+│   ├── server.js                    # Main entry point (Express app setup)
+│   ├── .env                         # Environment variables
+│   └── package.json
+│
+└── package.json                     # Root workspace config
+
+
+================================================================================
+  9. API ENDPOINTS SUMMARY (13 Route Groups, 40+ Endpoints)
+================================================================================
+
+Auth (/api/auth):
+  POST   /login/student          - Student login
+  POST   /login/admin            - Admin login
+  POST   /logout                 - Logout (clear refresh cookie)
+  GET    /me                     - Get current user profile
+  POST   /refresh                - Refresh access token
+  POST   /forgot-password        - Send OTP email
+  POST   /reset-password         - Verify OTP & reset password
+  POST   /registration-status    - Check registration status (public)
+  GET    /google                 - Google OAuth redirect
+  GET    /google/callback        - Google OAuth callback
+
+Students (/api/students):
+  GET    /profile                - Get student profile
+  PUT    /profile                - Update student profile
+  PUT    /change-password        - Change password
+  GET    /dashboard/stats        - Dashboard statistics
+
+Admin (/api/admin):
+  GET    /students               - Get all students in block
+  GET    /students/:studentID    - Get single student details
+  GET    /registrations          - Get pending registrations
+  PATCH  /students/:id/approve   - Approve registration
+  PATCH  /students/:id/reject    - Reject registration
+  DELETE /students/:studentId    - Soft-delete student
+  PATCH  /students/:id/reactivate - Reactivate student
+  GET    /dashboard/stats        - Admin dashboard statistics
+
+Complaints (/api/complaints):
+  POST   /                       - Create complaint (student)
+  GET    /my                     - Get my complaints (student)
+  GET    /admin                  - Get block complaints (admin)
+  PATCH  /:id/accept             - Accept complaint (admin)
+  PATCH  /:id/resolve            - Resolve complaint (admin)
+  PATCH  /:id/status             - Update status (admin)
+
+Attendance (/api/attendance):
+  GET    /my                     - Get my attendance (student)
+  POST   /                       - Record attendance (admin)
+  GET    /                       - Get all attendance (admin)
+  GET    /stats                  - Get attendance stats (admin)
+  GET    /by-date                - Get by date (admin)
+
+Mess Leave (/api/mess-leave):
+  POST   /                       - Apply for leave (student)
+  GET    /my                     - Get my leaves (student)
+  GET    /admin                  - Get block leaves (admin)
+  PATCH  /:id/approve            - Approve leave (admin)
+  PATCH  /:id/reject             - Reject leave (admin)
+
+Invoices (/api/invoices):
+  GET    /my                     - Get my invoices (student)
+  GET    /admin                  - Get block invoices (admin)
+  POST   /                       - Create invoice (admin)
+  PATCH  /:id/pay                - Mark as paid (admin)
+
+Room Booking (/api/room-booking):
+  GET    /available              - Get available rooms
+  POST   /                       - Book a room (student)
+  GET    /my                     - Get my bookings (student)
+  GET    /admin                  - Get block bookings (admin)
+  PATCH  /:id/status             - Approve/reject booking (admin)
+
+Room Change (/api/room-change):
+  POST   /                       - Request room change (student)
+  GET    /my                     - Get my requests (student)
+  GET    /admin                  - Get block requests (admin)
+  PATCH  /:id                    - Approve/reject (admin)
+
+Mess Menu (/api/mess-menu):
+  GET    /                       - Get mess menu
+  POST   /                       - Create/update menu (admin)
+  DELETE /:id                    - Delete menu entry (admin)
+
+Announcements (/api/announcements):
+  POST   /                       - Create announcement (admin)
+  GET    /my                     - Get my announcements (student)
+  GET    /admin                  - Get block announcements (admin)
+
+Notifications (/api/notifications):
+  GET    /                       - Get my notifications (student)
+  PATCH  /read-all               - Mark all as read (student)
+  PATCH  /:id/read               - Mark one as read (student)
+
+Registration (/api/registration):
+  POST   /                       - Submit registration request
+
+
+================================================================================
+  10. HOW THE SYSTEM WORKS — END-TO-END FLOW
+================================================================================
+
+STUDENT REGISTRATION FLOW:
+  1. Student fills registration form on /register page
+  2. Frontend sends POST /api/auth/login/student (or /api/registration)
+  3. Server validates fields, checks for duplicates, hashes password
+  4. Creates StudentRegistrationRequest document (status: "pending")
+  5. Admin sees request on ManageStudents page (GET /api/admin/registrations)
+  6. Admin clicks Approve → Server creates User doc, marks request "approved"
+  7. Approval email sent to student's college email via Nodemailer
+  8. Student can now login with Student ID + Password
+
+AUTHENTICATION FLOW:
+  1. Student/Admin submits credentials on /login page
+  2. Server validates credentials, generates access + refresh tokens
+  3. Access token returned in response body → stored in React state (memory)
+  4. Refresh token set as HTTP-only cookie + stored in Redis
+  5. Axios interceptor attaches Bearer token to every subsequent request
+  6. When access token expires (15 min), 401 response triggers auto-refresh
+  7. Axios interceptor calls POST /api/auth/refresh → gets new access token
+  8. Original failed request is retried with new token — seamless to user
+
+COMPLAINT RESOLUTION FLOW:
+  1. Student creates complaint (POST /api/complaints)
+  2. Admin views block complaints (GET /api/complaints/admin)
+  3. Admin accepts complaint, sets resolution date/time
+  4. Admin resolves complaint (PATCH /api/complaints/:id/resolve)
+  5. Server creates in-app Notification for student
+  6. Server sends resolution email to student's college email
+  7. Student sees notification badge update, views resolved complaint
+
+INVOICE BROADCAST FLOW:
+  1. Admin creates broadcast invoice (POST /api/invoices, isBroadcast: true)
+  2. Server finds ALL approved students in admin's block
+  3. Creates individual Invoice document for each student
+  4. Creates in-app Notification for each student
+  5. Each student sees the invoice on their MyInvoices page
+  6. Admin marks individual invoices as "paid" as students pay
+
+
+================================================================================
+  END OF DOCUMENTATION
+================================================================================

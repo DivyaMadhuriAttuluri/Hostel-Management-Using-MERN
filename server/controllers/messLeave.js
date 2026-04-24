@@ -1,5 +1,7 @@
 import MessLeave from "../models/MessLeave.js";
 import { notify } from "../lib/notify.js";
+import { sendGenericEmail } from "../lib/sendEmail.js";
+import User from "../models/User.js";
 
 export const applyMessLeave = async (req, res) => {
   try {
@@ -98,6 +100,26 @@ export const approveMessLeave = async (req, res) => {
       message: `Your mess leave request from ${new Date(leave.startDate).toLocaleDateString()} to ${new Date(leave.endDate).toLocaleDateString()} has been approved.`,
       refId: leave._id,
     });
+
+    // 📧 Send email
+    try {
+      const student = await User.findById(leave.student).select('collegeEmail fullName');
+      if (student?.collegeEmail) {
+        await sendGenericEmail({
+          to: student.collegeEmail,
+          subject: "Mess Leave Approved ✅ — Hostel Management",
+          html: `
+            <h2>Mess Leave Approved</h2>
+            <p>Hello <b>${student.fullName}</b>,</p>
+            <p>Your mess leave from <b>${new Date(leave.startDate).toLocaleDateString()}</b> to <b>${new Date(leave.endDate).toLocaleDateString()}</b> has been approved.</p>
+            <br/>
+            <p>Regards,<br/>Hostel Administration</p>
+          `,
+        });
+      }
+    } catch (emailErr) {
+      console.error('Mess leave email error:', emailErr.message);
+    }
 
     res.json({ success: true, leave });
   } catch (error) {

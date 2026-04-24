@@ -60,3 +60,20 @@ export const sendRegistrationStatusEmail = async ({
     console.error("Nodemailer Email Error:", error.message);
   }
 };
+
+/**
+ * Generic email sender for any purpose
+ */
+export const sendGenericEmail = async ({ to, subject, html }) => {
+  try {
+    await transporter.sendMail({
+      from: process.env.NODEMAILER_EMAIL,
+      to,
+      subject,
+      html,
+    });
+    console.log(`📧 Email sent to ${to} (${subject})`);
+  } catch (error) {
+    console.error("Nodemailer Email Error:", error.message);
+  }
+};
